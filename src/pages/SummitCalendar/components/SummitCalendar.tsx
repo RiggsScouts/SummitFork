@@ -1,16 +1,17 @@
 import React, { FocusEvent } from "react";
-import { Agenda, Month, Week, Inject, EventSettingsModel, ScheduleComponent, ActionEventArgs, EventRenderedArgs, ViewsDirective, ViewDirective, PopupOpenEventArgs } from "@syncfusion/ej2-react-schedule";
+import { Agenda, Month, Week, Inject, EventSettingsModel, ScheduleComponent, ActionEventArgs, EventRenderedArgs, PopupOpenEventArgs } from "@syncfusion/ej2-react-schedule";
 import SummitCalendarItem from "../models/SummitCalendarItems";
 import { createNewEvent, deleteEvent, fetchActivity, fetchMemberCalendars, fetchMemberEvents, fetchUnitMembers, updateEvent, updateMemberCalendars } from "@/services";
 import moment from "moment";
 import { TerrainEvent, TerrainEventSummary, TerrainUnitMember, TerrrainCalendarResult } from "@/types/terrainTypes";
-import { DdtChangeEventArgs, DropDownListComponent, DropDownTreeComponent } from "@syncfusion/ej2-react-dropdowns";
-import { DatePickerComponent, TimePickerComponent } from "@syncfusion/ej2-react-calendars";
+import { DdtChangeEventArgs, DropDownTreeComponent } from "@syncfusion/ej2-react-dropdowns";
 import { TerrainState } from "@/helpers";
 import { FormValidator, FormValidatorModel, TextBoxComponent } from "@syncfusion/ej2-react-inputs";
 //import { enableRipple } from "@syncfusion/ej2-base";
 import TerrainEventItem from "../models/TerrainEventItem";
-import { DialogComponent, DialogUtility } from "@syncfusion/ej2-react-popups";
+import { DatePickerComponent, TimePickerComponent } from "@/components/DateTimeInputs";
+import { DropDownListComponent } from "@/components/SimpleDropdown";
+import { DialogComponent, DialogUtility } from "@/components/DialogComponent";
 
 interface SummitCalendarProps {
   items: SummitCalendarItem[];
@@ -33,7 +34,6 @@ interface SummitCalendarState {
 
 export class SummitCalendarComponent extends React.Component<SummitCalendarProps, SummitCalendarState> {
   private scheduleComponent: React.RefObject<ScheduleComponent> = React.createRef();
-  private dialogInstance: DialogComponent | null = null;
   constructor(props: SummitCalendarProps) {
     super(props);
     //enableRipple(true);
@@ -216,16 +216,17 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     }
   };
 
-  handleTreeChange = (event: DdtChangeEventArgs) => {
+  handleTreeChange = (event: DdtChangeEventArgs | { element: { id: string }; value: string | string[] }) => {
+    const selectedValues = Array.isArray(event.value) ? event.value : event.value ? [event.value] : [];
     switch (event.element.id) {
       case "organisers":
         this.setState((prevState) => ({
           activity: {
             ...prevState.activity,
-            organisers: event.value
+            organisers: selectedValues.length
               ? this.state.unitMembers
                   .filter((um) => {
-                    return event.value.includes(um.id);
+                    return selectedValues.includes(um.id);
                   })
                   .map((um) => {
                     return {
@@ -244,10 +245,10 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
             ...prevState.activity,
             attendance: {
               ...prevState.activity?.attendance,
-              leader_members: event.value
+              leader_members: selectedValues.length
                 ? this.state.unitMembers
                     .filter((um) => {
-                      return event.value.includes(um.id);
+                      return selectedValues.includes(um.id);
                     })
                     .map((um) => {
                       return {
@@ -267,10 +268,10 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
             ...prevState.activity,
             attendance: {
               ...prevState.activity?.attendance,
-              assistant_members: event.value
+              assistant_members: selectedValues.length
                 ? this.state.unitMembers
                     .filter((um) => {
-                      return event.value.includes(um.id);
+                      return selectedValues.includes(um.id);
                     })
                     .map((um) => {
                       return {
@@ -290,7 +291,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
             ...prevState.activity,
             review: {
               ...prevState.activity?.review,
-              scout_method_elements: event.value,
+              scout_method_elements: selectedValues,
             },
           },
         }));
@@ -355,9 +356,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
             value={this.state.activity?.challenge_area}
             text={this.challangeAreas.find((c) => c.value == this.state.activity?.challenge_area)?.text}
             change={this.handleTreeChange}
-            bind={this}
             enabled={isEditable}
-            data-msg-containerid="titleError"
           />
           <div id="caError"></div>
         </label>
@@ -613,7 +612,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
                 const event = await fetchActivity((props.event as TerrainEventSummary).id);
                 window.$nuxt.$accessor.programming.setActivity(event);
                 window.$nuxt.$accessor.programming.setActivityFlow("view");
-                this.dialogInstance?.show(true);
+                this.setState({ hideDialog: false });
                 $("#eventFrame").attr("src", "https://terrain.scouts.com.au/programming/view-activity");
                 $("#eventFrame").on("load", function () {
                   const iframeHead = $(this).contents().find("head");
@@ -648,7 +647,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
   dialogButtons = [
     {
       click: () => {
-        this.dialogInstance?.hide();
+        this.setState({ hideDialog: true });
       },
       buttonModel: { content: "Close Event", isPrimary: true, cssClass: "e-event-edit e-btn e-primary" },
     },
@@ -676,6 +675,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       <div id="scheduler" style={{ width: "100%", height: "100%" }}>
         <ScheduleComponent
           currentView="Month"
+          views={["Month"]}
           ref={this.scheduleComponent}
           eventSettings={eventSettings}
           actionComplete={this.handleActionComplete}
@@ -688,9 +688,6 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           popupClose={this.onPopupClosed}
           enableAdaptiveUI={true}
         >
-          <ViewsDirective>
-            <ViewDirective option="Month" />
-          </ViewsDirective>
           <Inject services={[Week, Month, Agenda]} />
         </ScheduleComponent>
         Select Calendars{" "}
@@ -707,17 +704,17 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
         <DialogComponent
           id="dialog"
           isModal={true}
-          visible={false}
+          visible={!this.state.hideDialog}
           header="View Event"
           target="#scheduler"
           animationSettings={{ effect: "None" }}
           close={() => {
             $("#eventFrame").attr("src", "about:blank");
+            this.setState({ hideDialog: true });
             this.fetchData();
           }}
           closeOnEscape={true}
           showCloseIcon={true}
-          ref={(dialog: DialogComponent) => (this.dialogInstance = dialog!)}
           cssClass="summit-dialog-max-size"
           buttons={this.dialogButtons}
         >

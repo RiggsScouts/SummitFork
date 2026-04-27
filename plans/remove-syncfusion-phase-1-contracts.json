@@ -14,20 +14,16 @@
     ],
     "src/pages/PresentAwards/components/PresentAwards.tsx": [
       "@syncfusion/ej2-base",
-      "@syncfusion/ej2-react-calendars",
       "@syncfusion/ej2-react-grids",
-      "@syncfusion/ej2-react-navigations",
-      "@syncfusion/ej2-react-notifications"
+      "@syncfusion/ej2-react-navigations"
     ],
     "src/pages/SectionSummary/components/UnitSummary.tsx": [
       "@syncfusion/ej2-react-grids",
       "@syncfusion/ej2-react-navigations"
     ],
     "src/pages/SummitCalendar/components/SummitCalendar.tsx": [
-      "@syncfusion/ej2-react-calendars",
       "@syncfusion/ej2-react-dropdowns",
       "@syncfusion/ej2-react-inputs",
-      "@syncfusion/ej2-react-popups",
       "@syncfusion/ej2-react-schedule"
     ]
   },

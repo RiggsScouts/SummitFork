@@ -23,9 +23,9 @@ import {
 } from "@syncfusion/ej2-react-grids";
 import SummitAchievement from "../models/SummitAchievement";
 import { ClickEventArgs } from "@syncfusion/ej2-react-navigations";
-import { ToastComponent } from "@syncfusion/ej2-react-notifications";
-import { DatePickerComponent } from "@syncfusion/ej2-react-calendars";
 import moment from "moment";
+import { ToastComponent, ToastHandle } from "@/components/ToastComponent";
+import { DatePickerComponent } from "@/components/DateTimeInputs";
 
 L10n.load({
   "en-US": {
@@ -53,7 +53,7 @@ export default class AwardsTable extends React.Component<AwardsTableProps, Award
   }
   grid: GridComponent | null = null;
   filtering: boolean = true;
-  toastInstance: ToastComponent = null!;
+  toastInstance: ToastHandle = null!;
   selIndex: number[] = [];
   firstLoad: boolean = true;
   componentDidUpdate(prevProps: AwardsTableProps) {
