@@ -19,6 +19,40 @@
   justify-content: flex-end;
 }
 
+.summit-form-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #c8c6c4;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.summit-button {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 8px;
+  padding: 8px 12px;
+}
+
+.summit-button-primary {
+  background: #004C00;
+  border-color: #004C00;
+  color: #ffffff;
+}
+
+.summit-button-secondary {
+  background: #f3f2f1;
+  border-color: #d2d0ce;
+  color: #201f1e;
+}
+
+.summit-button-danger {
+  background: #a4262c;
+  border-color: #a4262c;
+  color: #ffffff;
+}
+
 nav:has(* a[href*="/terrain"]),
 nav:has(* a[href*="/terrain"]) * .NavMenu__menu-group:not(div:has(* a[href*="/terrain"])),
 nav:has(* a[href*="/terrain"]) * .NavMenu__expansion-panel-content,

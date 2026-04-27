@@ -1,16 +1,20 @@
 import React, { FocusEvent } from "react";
-import { Agenda, Month, Week, Inject, EventSettingsModel, ScheduleComponent, ActionEventArgs, EventRenderedArgs, ViewsDirective, ViewDirective, PopupOpenEventArgs } from "@syncfusion/ej2-react-schedule";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import listPlugin from "@fullcalendar/list";
+import interactionPlugin from "@fullcalendar/interaction";
+import { DateSelectArg, DatesSetArg, EventClickArg, EventMountArg } from "@fullcalendar/core";
 import SummitCalendarItem from "../models/SummitCalendarItems";
 import { createNewEvent, deleteEvent, fetchActivity, fetchMemberCalendars, fetchMemberEvents, fetchUnitMembers, updateEvent, updateMemberCalendars } from "@/services";
 import moment from "moment";
-import { TerrainEvent, TerrainEventSummary, TerrainUnitMember, TerrrainCalendarResult } from "@/types/terrainTypes";
-import { DdtChangeEventArgs, DropDownListComponent, DropDownTreeComponent } from "@syncfusion/ej2-react-dropdowns";
-import { DatePickerComponent, TimePickerComponent } from "@syncfusion/ej2-react-calendars";
-import { TerrainState } from "@/helpers";
-import { FormValidator, FormValidatorModel, TextBoxComponent } from "@syncfusion/ej2-react-inputs";
-//import { enableRipple } from "@syncfusion/ej2-base";
+import { TerrainEvent, TerrainUnitMember, TerrrainCalendarResult } from "@/types/terrainTypes";
+import { TerrainState, applyGroupedMultiSelectChange, buildGroupedMemberOptions, validateSummitCalendarActivity } from "@/helpers";
+import { GroupedMultiSelectGroup } from "@/helpers/SummitCalendarValidation";
 import TerrainEventItem from "../models/TerrainEventItem";
-import { DialogComponent, DialogUtility } from "@syncfusion/ej2-react-popups";
+import { DatePickerComponent, TimePickerComponent } from "@/components/DateTimeInputs";
+import { DropDownListComponent } from "@/components/SimpleDropdown";
+import { DialogComponent, DialogUtility } from "@/components/DialogComponent";
 
 interface SummitCalendarProps {
   items: SummitCalendarItem[];
@@ -22,6 +26,7 @@ interface SummitCalendarState {
   sortState: { sortColumn: string; sortDirection: string };
   activity: TerrainEvent;
   editorIsLoading: boolean;
+  isEditorOpen: boolean;
   members: { value: string; text: string }[];
   currentUnitID: string;
   unitMembers: TerrainUnitMember[];
@@ -29,19 +34,18 @@ interface SummitCalendarState {
   iframeKey: number;
   calendars: TerrrainCalendarResult;
   allCalendars: { id: string; name: string; selected: boolean }[];
+  currentWindow: { startDate: string; endDate: string } | null;
 }
 
 export class SummitCalendarComponent extends React.Component<SummitCalendarProps, SummitCalendarState> {
-  private scheduleComponent: React.RefObject<ScheduleComponent> = React.createRef();
-  private dialogInstance: DialogComponent | null = null;
   constructor(props: SummitCalendarProps) {
     super(props);
-    //enableRipple(true);
     this.state = {
       items: [],
       sortState: { sortColumn: "file", sortDirection: "ascending" },
       activity: { start_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), end_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ") },
       editorIsLoading: false,
+      isEditorOpen: false,
       members: [],
       currentUnitID: TerrainState.getUnitID(),
       unitMembers: [],
@@ -49,6 +53,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       iframeKey: 0,
       calendars: {},
       allCalendars: [],
+      currentWindow: null,
     };
     this.handleInputChange = this.handleInputChange.bind(this);
   }
@@ -69,35 +74,60 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     this.setState({ calendars: calendars, allCalendars: allCalendars });
   };
 
-  fetchData = async () => {
+  fetchData = async (startDate?: string, endDate?: string) => {
     const unitMembers = await fetchUnitMembers();
     const members = unitMembers.map((member) => ({ value: member.id, text: member.first_name + " " + member.last_name }));
     this.setState({ members: members, unitMembers: unitMembers });
-    const scheduleObj = this.scheduleComponent.current;
-    const viewDates = scheduleObj?.getCurrentViewDates();
-    const startDate = moment(viewDates ? viewDates[0] : new Date()).format("YYYY-MM-DDTHH:mm:ss");
-    const endDate = moment(viewDates ? viewDates[viewDates.length - 1] : new Date()).format("YYYY-MM-DDTHH:mm:ss");
 
-    fetchMemberEvents(startDate, endDate).then((data) => {
-      const items = data.map((item) => {
-        return new SummitCalendarItem(item);
-      });
-      this.setState({
-        items: items,
-      });
-      this.props.onUpdate(items);
+    const defaultStart = moment().startOf("month").format("YYYY-MM-DDTHH:mm:ss");
+    const defaultEnd = moment().endOf("month").format("YYYY-MM-DDTHH:mm:ss");
+    const rangeStart = startDate ?? this.state.currentWindow?.startDate ?? defaultStart;
+    const rangeEnd = endDate ?? this.state.currentWindow?.endDate ?? defaultEnd;
+
+    const data = await fetchMemberEvents(rangeStart, rangeEnd);
+    const items = data.map((item) => new SummitCalendarItem(item));
+    this.setState({
+      items: items,
+    });
+    this.props.onUpdate(items);
+  };
+
+  handleDatesSet = (args: DatesSetArg) => {
+    const startDate = moment(args.start).format("YYYY-MM-DDTHH:mm:ss");
+    const endDate = moment(args.end).format("YYYY-MM-DDTHH:mm:ss");
+    this.setState({ currentWindow: { startDate, endDate } }, () => {
+      this.fetchData(startDate, endDate);
     });
   };
 
-  handleActionComplete = (args: ActionEventArgs) => {
-    if (args.requestType === "viewNavigate" || args.requestType === "dateNavigate") {
-      this.fetchData();
+  eventDidMount = (args: EventMountArg) => {
+    const item = args.event.extendedProps.item as SummitCalendarItem | undefined;
+    if (item?.color) {
+      args.el.style.backgroundColor = item.color;
+      args.el.style.borderColor = item.color;
     }
   };
 
-  eventRendered = (args: EventRenderedArgs) => {
-    const data = args.data as SummitCalendarItem;
-    args.element.style.backgroundColor = data.color ?? "";
+  handleEventClick = (args: EventClickArg) => {
+    this.setState({ editorIsLoading: true, isEditorOpen: true });
+    this.getActivity(args.event.id);
+  };
+
+  handleDateSelect = (args: DateSelectArg) => {
+    if (args.allDay) {
+      this.newActivity(moment(args.start).hour(19).minute(0).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), moment(args.start).hour(21).minute(0).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"));
+      return;
+    }
+
+    this.newActivity(moment(args.start).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), moment(args.end).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"));
+  };
+
+  closeEditor = () => {
+    this.setState({
+      isEditorOpen: false,
+      editorIsLoading: false,
+      activity: { start_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), end_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ") },
+    });
   };
 
   getActivity = async (id: string) => {
@@ -105,48 +135,16 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     if (activity) {
       activity.start_datetime = moment(activity.start_datetime).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ");
       activity.end_datetime = moment(activity.end_datetime).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ");
-      this.setState({ activity: activity, editorIsLoading: false }, () => {
-        if (this.scheduleComponent.current && this.state.activity) {
-          this.scheduleComponent.current.openEditor(this.state.activity, "Add", false);
-        }
-      });
+      this.setState({ activity: activity, editorIsLoading: false, isEditorOpen: true });
     } else this.newActivity(moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"));
   };
 
   newActivity = async (startDate: string, endDate: string) => {
-    moment(this.state.activity?.start_datetime).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ");
     const activity = {
       start_datetime: moment(startDate).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
       end_datetime: moment(endDate).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
     };
-    this.setState({ activity: activity, editorIsLoading: false }, () => {
-      if (this.scheduleComponent.current && this.state.activity) {
-        this.scheduleComponent.current.openEditor(this.state.activity, "Add", false);
-      }
-    });
-  };
-
-  onPopupOpen = (args: PopupOpenEventArgs) => {
-    if (args.type === "Editor" && args.data) {
-      if (args.target) {
-        args.cancel = true;
-        this.setState({ editorIsLoading: true });
-        const eventId = args.data.Id;
-        this.getActivity(eventId);
-      }
-    }
-    if (args.type === "QuickInfo" && args.data && !args.data.Id) {
-      args.cancel = true;
-      if (args.data.isAllDay) {
-        this.newActivity(moment(args.data.startTime).hour(19).minute(0).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), moment(args.data.startTime).hour(21).minute(0).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"));
-      } else this.newActivity(args.data.startTime.utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), args.data.endTime.utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"));
-    }
-  };
-
-  onPopupClosed = (args: PopupOpenEventArgs) => {
-    if (args.type === "Editor") {
-      this.setState({ activity: { start_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), end_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ") } });
-    }
+    this.setState({ activity: activity, editorIsLoading: false, isEditorOpen: true });
   };
 
   challangeAreas = [
@@ -216,85 +214,8 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     }
   };
 
-  handleTreeChange = (event: DdtChangeEventArgs) => {
+  handleSelectChange = (event: { element: { id: string }; value: string | string[] }) => {
     switch (event.element.id) {
-      case "organisers":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            organisers: event.value
-              ? this.state.unitMembers
-                  .filter((um) => {
-                    return event.value.includes(um.id);
-                  })
-                  .map((um) => {
-                    return {
-                      id: um.id,
-                      first_name: um.first_name,
-                      last_name: um.last_name,
-                    };
-                  })
-              : [],
-          },
-        }));
-        break;
-      case "leader_members":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            attendance: {
-              ...prevState.activity?.attendance,
-              leader_members: event.value
-                ? this.state.unitMembers
-                    .filter((um) => {
-                      return event.value.includes(um.id);
-                    })
-                    .map((um) => {
-                      return {
-                        id: um.id,
-                        first_name: um.first_name,
-                        last_name: um.last_name,
-                      };
-                    })
-                : [],
-            },
-          },
-        }));
-        break;
-      case "assistant_members":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            attendance: {
-              ...prevState.activity?.attendance,
-              assistant_members: event.value
-                ? this.state.unitMembers
-                    .filter((um) => {
-                      return event.value.includes(um.id);
-                    })
-                    .map((um) => {
-                      return {
-                        id: um.id,
-                        first_name: um.first_name,
-                        last_name: um.last_name,
-                      };
-                    })
-                : [],
-            },
-          },
-        }));
-        break;
-      case "scout_method_elements":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            review: {
-              ...prevState.activity?.review,
-              scout_method_elements: event.value,
-            },
-          },
-        }));
-        break;
       case "challenge_area":
         this.setState((prevState) => ({
           activity: {
@@ -314,9 +235,68 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     }
   };
 
+  handleGroupedMultiSelectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedValues = Array.from(event.target.selectedOptions).map((option) => option.value);
+    const fieldId = event.target.id;
+
+    this.setState((prevState) => ({
+      activity: applyGroupedMultiSelectChange(prevState.activity, fieldId, selectedValues, this.state.unitMembers),
+    }));
+  };
+
+  getScoutMethodGroups = (): GroupedMultiSelectGroup[] => {
+    const programDesignValues = ["symbolic_framework", "community_involvement", "learn_by_doing", "nature_and_outdoors"];
+    const leadershipValues = ["patrol_system", "youth_leading_adult_supporting", "promise_and_law", "personal_progression"];
+
+    return [
+      {
+        label: "Program Design",
+        options: this.scoutMethodOptions.filter((option) => programDesignValues.includes(option.value)).map((option) => ({ label: option.text, value: option.value })),
+      },
+      {
+        label: "Leadership and Values",
+        options: this.scoutMethodOptions.filter((option) => leadershipValues.includes(option.value)).map((option) => ({ label: option.text, value: option.value })),
+      },
+    ];
+  };
+
+  getCalendarGroups = (): GroupedMultiSelectGroup[] => {
+    const ownCalendars = this.state.calendars.own_calendars ?? [];
+    const otherCalendars = this.state.calendars.other_calendars ?? [];
+
+    return [
+      {
+        label: "My Calendars",
+        options: ownCalendars.map((calendar) => ({ label: calendar.title, value: calendar.id })),
+      },
+      {
+        label: "Other Calendars",
+        options: otherCalendars.map((calendar) => ({ label: calendar.title, value: calendar.id })),
+      },
+    ];
+  };
+
+  renderGroupedMultiSelect = (id: string, groups: GroupedMultiSelectGroup[], value: string[], disabled: boolean = false) => {
+    const optionCount = groups.reduce((count, group) => count + group.options.length, 0);
+
+    return (
+      <select id={id} name={id} multiple={true} value={value} onChange={this.handleGroupedMultiSelectChange} disabled={disabled} className="summit-form-input" size={Math.min(Math.max(optionCount, 4), 10)}>
+        {groups.map((group) => (
+          <optgroup key={`${id}-${group.label}`} label={group.label}>
+            {group.options.map((option) => (
+              <option key={`${id}-${group.label}-${option.value}`} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    );
+  };
+
   editorHeaderTemplate = () => {
-    if (!this.state.activity?.id) return <div className="e-title-text">New Event</div>;
-    else return <div className="e-title-text">{this.state.activity?.title}</div>;
+    if (!this.state.activity?.id) return "New Event";
+    else return this.state.activity?.title ?? "Event";
   };
   handleFocus = (e: FocusEvent) => {
     // Get the id of the relatedTarget
@@ -330,21 +310,21 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       e.stopPropagation();
     }
   };
-  editorTemplate = (props: SummitCalendarItem) => {
-    console.log("editorTemplate Opened");
-    console.log(this.state.activity);
-    const { activity, members, currentUnitID } = this.state;
+  editorTemplate = () => {
+    const { activity, currentUnitID } = this.state;
+    const memberGroups = buildGroupedMemberOptions(this.state.unitMembers);
+    const scoutMethodGroups = this.getScoutMethodGroups();
     const isEditable = (activity?.status !== "concluded" && currentUnitID === activity?.owner_id) || (activity && activity.id === undefined);
-    return props !== undefined ? (
+    return (
       <div className="editor-container">
         <label>
           Title <span style={{ color: "red" }}>*</span>
-          <TextBoxComponent className="e-input" type="text" name="title" value={activity?.title || ""} onChange={this.handleInputChange} disabled={!isEditable} data-msg-containerid="titleError" />
+          <input className="summit-form-input" type="text" name="title" value={activity?.title || ""} onChange={this.handleInputChange} disabled={!isEditable} data-msg-containerid="titleError" />
           <div id="titleError" />
         </label>
         <label>
           Location <span style={{ color: "red" }}>*</span>
-          <TextBoxComponent className="e-input" type="text" name="location" value={activity?.location || ""} onChange={this.handleInputChange} disabled={!isEditable} />
+          <input className="summit-form-input" type="text" name="location" value={activity?.location || ""} onChange={this.handleInputChange} disabled={!isEditable} />
         </label>
         <label>
           Challenge Area <span style={{ color: "red" }}>*</span>
@@ -354,10 +334,8 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
             dataSource={this.challangeAreas}
             value={this.state.activity?.challenge_area}
             text={this.challangeAreas.find((c) => c.value == this.state.activity?.challenge_area)?.text}
-            change={this.handleTreeChange}
-            bind={this}
+            change={this.handleSelectChange}
             enabled={isEditable}
-            data-msg-containerid="titleError"
           />
           <div id="caError"></div>
         </label>
@@ -381,18 +359,10 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
         <label>
           Scout Method <span style={{ color: "red" }}>*</span>
           {isEditable ? (
-            <DropDownTreeComponent
-              name="scout_method_elements"
-              showCheckBox={true}
-              id="scout_method_elements"
-              fields={{ dataSource: this.scoutMethodOptions, text: "text", value: "value" }}
-              value={this.state.activity?.review?.scout_method_elements}
-              change={this.handleTreeChange}
-              enabled={isEditable}
-            />
+            this.renderGroupedMultiSelect("scout_method_elements", scoutMethodGroups, this.state.activity?.review?.scout_method_elements ?? [], !isEditable)
           ) : (
             <input
-              className="e-input"
+              className="summit-form-input"
               value={activity?.review?.scout_method_elements
                 .map((sm) => {
                   return this.scoutMethodOptions.find((smo) => smo.value == sm)?.text;
@@ -405,56 +375,45 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
         <label>
           Organisers <span style={{ color: "red" }}>*</span>
           {isEditable ? (
-            <DropDownTreeComponent
-              showCheckBox={true}
-              name="organisers"
-              id="organisers"
-              fields={{ dataSource: members, text: "text", value: "value" }}
-              value={this.state.activity?.organisers?.map((i) => {
+            this.renderGroupedMultiSelect(
+              "organisers",
+              memberGroups,
+              this.state.activity?.organisers?.map((i) => {
                 return typeof i === "object" ? i.id : "";
-              })}
-              change={this.handleTreeChange}
-              enabled={isEditable}
-            />
+              }) ?? [],
+              !isEditable,
+            )
           ) : (
-            <input className="e-input" type="text" name="organisers" value={activity?.organisers?.map((i) => i.first_name + " " + i.last_name).join(", ")} disabled={true} />
+            <input className="summit-form-input" type="text" name="organisers" value={activity?.organisers?.map((i) => i.first_name + " " + i.last_name).join(", ")} disabled={true} />
           )}
         </label>
         <label>
           Leads
           {isEditable ? (
-            <DropDownTreeComponent
-              name="leader_members"
-              showCheckBox={true}
-              id="leader_members"
-              fields={{ dataSource: members, text: "text", value: "value" }}
-              value={this.state.activity?.attendance?.leader_members?.map((i) => {
+            this.renderGroupedMultiSelect(
+              "leader_members",
+              memberGroups,
+              this.state.activity?.attendance?.leader_members?.map((i) => {
                 return typeof i === "object" ? i.id : "";
-              })}
-              change={this.handleTreeChange}
-              enabled={isEditable}
-            />
+              }) ?? [],
+              !isEditable,
+            )
           ) : (
-            <input className="e-input" type="text" name="leads" value={activity?.attendance?.leader_members?.map((i) => i.first_name + " " + i.last_name).join(", ")} disabled={true} />
+            <input className="summit-form-input" type="text" name="leads" value={activity?.attendance?.leader_members?.map((i) => i.first_name + " " + i.last_name).join(", ")} disabled={true} />
           )}
         </label>
         <label>
           Assists
-          <DropDownTreeComponent
-            name="assistant_members"
-            showCheckBox={true}
-            id="assistant_members"
-            fields={{ dataSource: members, text: "text", value: "value" }}
-            value={this.state.activity?.attendance?.assistant_members?.map((i) => {
+          {this.renderGroupedMultiSelect(
+            "assistant_members",
+            memberGroups,
+            this.state.activity?.attendance?.assistant_members?.map((i) => {
               return i?.id ?? "";
-            })}
-            change={this.handleTreeChange}
-            enabled={isEditable}
-          />
+            }) ?? [],
+            !isEditable,
+          )}
         </label>
       </div>
-    ) : (
-      ""
     );
   };
 
@@ -462,40 +421,24 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     const { activity } = this.state;
     if (!activity) return;
     console.log(activity);
-    const options: FormValidatorModel = {
-      rules: {
-        title: { required: true },
-        location: { required: true },
-        challenge_area: { required: true },
-        scout_method_elements: { required: true },
-        organisers: { required: true },
-        start_date: { required: true },
-        end_date: { required: true },
-        start_time: { required: true },
-        end_time: { required: true },
-      },
-    };
-    const formObject = new FormValidator(".editor-container", options);
-    if (!formObject.validate()) {
+    const validationResult = validateSummitCalendarActivity(activity);
+    if (!validationResult.isValid) {
+      const firstError = Object.values(validationResult.errors)[0];
+      if (firstError) {
+        alert(firstError);
+      }
       return;
     }
-    if (this.state.activity?.attendance?.leader_members?.some((lm) => this.state.activity?.attendance?.assistant_members?.some((am) => lm.id === am.id))) {
-      alert("A member can't both be a leader and an assistant at the same time");
-      return;
-    }
-    if (this.state.activity?.start_datetime && this.state.activity?.end_datetime && moment(this.state.activity?.start_datetime).isSameOrAfter(this.state.activity?.end_datetime)) {
-      alert("Start date can't be after end date");
-      return;
-    }
+
     const eventToSave = new TerrainEventItem(activity);
     if (eventToSave.id) {
       await updateEvent(eventToSave.id, JSON.stringify(eventToSave));
-      this.scheduleComponent.current?.closeEditor();
+      this.setState({ isEditorOpen: false });
       this.fetchData();
     }
     if (!eventToSave.id) {
       await createNewEvent(JSON.stringify(eventToSave));
-      this.scheduleComponent.current?.closeEditor();
+      this.setState({ isEditorOpen: false });
       this.fetchData();
     }
     if (nextWeek) {
@@ -507,6 +450,38 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     }
   };
 
+  openTerrainDialog = async () => {
+    if (!this.state.activity?.id) {
+      return;
+    }
+
+    const event = await fetchActivity(this.state.activity.id);
+    window.$nuxt.$accessor.programming.setActivity(event);
+    window.$nuxt.$accessor.programming.setActivityFlow("view");
+    this.setState({ hideDialog: false });
+    $("#eventFrame").attr("src", "https://terrain.scouts.com.au/programming/view-activity");
+    $("#eventFrame").on("load", function () {
+      const iframeHead = $(this).contents().find("head");
+      const css =
+        '<style type="text/css">' +
+        `
+      #freshworks-container, header, nav, footer {
+        visibility: hidden; display: none;
+      }
+      main {
+        padding: 0 !important;
+      }
+      .v-application .v-main__wrap .container {
+        margin: 0 !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+    }
+      ` +
+        "</style>";
+      $(iframeHead).append(css);
+    });
+  };
+
   editorFooterTemplate = () => {
     const { activity } = this.state;
     const isEditable = (activity?.status !== "concluded" && TerrainState.getUnitID() === activity?.owner_id) || (activity && activity.id === undefined);
@@ -514,14 +489,13 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       <div id="event-footer">
         <div id="right-button">
           {!activity?.id ? (
-            <button id="Save" className="e-control e-btn e-primary" data-ripple="true" onClick={() => this.saveActivity(true)}>
+            <button id="Save" className="summit-button summit-button-primary" onClick={() => this.saveActivity(true)}>
               Save & Add Next Week
             </button>
           ) : (
             <button
               id="Delete"
-              className="e-control e-btn e-danger"
-              data-ripple="true"
+              className="summit-button summit-button-danger"
               onClick={() => {
                 const dialogObj = DialogUtility.confirm({
                   title: "Delete Item",
@@ -531,15 +505,14 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
                     click: () => {
                       deleteEvent(this.state.activity?.id || "").then(() => {
                         dialogObj.hide();
-                        this.scheduleComponent.current?.deleteEvent(this.state.activity?.id || "");
-                        this.scheduleComponent.current?.closeEditor();
+                        this.setState({ isEditorOpen: false });
+                        this.fetchData();
                       });
                     },
                   },
                   cancelButton: {
                     click: () => {
                       dialogObj.hide();
-                      this.scheduleComponent.current?.closeEditor();
                     },
                   },
                 });
@@ -548,10 +521,15 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
               Delete
             </button>
           )}
-          <button id="Save" className="e-control e-btn e-primary" data-ripple="true" onClick={() => this.saveActivity()}>
+          {!!activity?.id && (
+            <button id="open-modal" className="summit-button summit-button-secondary" onClick={this.openTerrainDialog}>
+              Open in Terrain
+            </button>
+          )}
+          <button id="Save" className="summit-button summit-button-primary" onClick={() => this.saveActivity()}>
             Save
           </button>
-          <button id="Cancel" className="e-control e-btn e-secondary" data-ripple="true" onClick={() => this.scheduleComponent.current?.closeEditor()}>
+          <button id="Cancel" className="summit-button summit-button-secondary" onClick={this.closeEditor}>
             Cancel
           </button>
         </div>
@@ -559,7 +537,12 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     ) : (
       <div id="event-footer">
         <div id="right-button">
-          <button id="Cancel" className="e-control e-btn e-secondary" data-ripple="true" onClick={() => this.scheduleComponent.current?.closeEditor()}>
+          {!!activity?.id && (
+            <button id="open-modal" className="summit-button summit-button-secondary" onClick={this.openTerrainDialog}>
+              Open in Terrain
+            </button>
+          )}
+          <button id="Cancel" className="summit-button summit-button-secondary" onClick={this.closeEditor}>
             Close
           </button>
         </div>
@@ -567,96 +550,17 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     );
   };
 
-  quickInfoFooterTemplate = (props: { [key: string]: string | TerrainEvent }) => {
-    if (props.elementType === "cell") {
-      return <div>Cell Footer</div>;
-    } else {
-      return (
-        <div className="e-cell-footer">
-          <div className="right-button">
-            <button
-              id="edit"
-              className="e-event-edit e-btn e-primary"
-              title="Edit"
-              onClick={() => {
-                this.scheduleComponent.current?.closeQuickInfoPopup();
-                this.getActivity((props.event as TerrainEventSummary).id);
-              }}
-            >
-              {TerrainState.getUnitID() === (props.event as TerrainEventSummary).invitee_id ? "Edit" : "View"}
-            </button>
-            {TerrainState.getUnitID() === (props.event as TerrainEventSummary).invitee_id && (
-              <button
-                id="add"
-                className="e-event-edit e-btn e-primary"
-                title="Add"
-                onClick={() => {
-                  this.scheduleComponent.current?.closeQuickInfoPopup();
-                  const startDatetime = (props.event as TerrainEventSummary).start_datetime;
-                  const endDatetime = (props.event as TerrainEventSummary).end_datetime;
-
-                  const newStartDatetime = moment(startDatetime).add(7, "days").utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ");
-                  const newEndDatetime = moment(endDatetime).add(7, "days").utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ");
-
-                  this.newActivity(newStartDatetime, newEndDatetime);
-                }}
-              >
-                Add Next Week
-              </button>
-            )}
-            <button
-              id="open-modal"
-              className="e-event-edit e-btn e-secondary"
-              title="Open Event"
-              onClick={async () => {
-                this.scheduleComponent.current?.closeQuickInfoPopup();
-                const event = await fetchActivity((props.event as TerrainEventSummary).id);
-                window.$nuxt.$accessor.programming.setActivity(event);
-                window.$nuxt.$accessor.programming.setActivityFlow("view");
-                this.dialogInstance?.show(true);
-                $("#eventFrame").attr("src", "https://terrain.scouts.com.au/programming/view-activity");
-                $("#eventFrame").on("load", function () {
-                  const iframeHead = $(this).contents().find("head");
-                  const css =
-                    '<style type="text/css">' +
-                    `
-                  #freshworks-container, header, nav, footer { 
-                    visibility: hidden; display: none; 
-                  } 
-                  main {
-                    padding: 0 !important; 
-                  }
-                  .v-application .v-main__wrap .container {
-                    margin: 0 !important; 
-                    max-width: 100% !important;
-                    padding: 0 !important; 
-                }
-                  ` +
-                    "</style>";
-                  $(iframeHead).append(css);
-                });
-              }}
-            >
-              Open in Terain
-            </button>
-          </div>
-        </div>
-      );
-    }
-  };
-
   dialogButtons = [
     {
       click: () => {
-        this.dialogInstance?.hide();
+        this.setState({ hideDialog: true });
       },
-      buttonModel: { content: "Close Event", isPrimary: true, cssClass: "e-event-edit e-btn e-primary" },
+      buttonModel: { content: "Close Event", isPrimary: true, cssClass: "summit-button summit-button-primary" },
     },
   ];
 
-  handleCalendarChange = (event: DdtChangeEventArgs) => {
-    if (!event.isInteracted) return;
-    const selectedCalendars = event.value as string[];
+  handleCalendarChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedCalendars = Array.from(event.target.selectedOptions).map((option) => option.value);
     const calendarUpdate = this.state.calendars;
     if (!calendarUpdate.own_calendars) return;
     calendarUpdate.own_calendars = calendarUpdate.own_calendars.map((calendar) => {
@@ -671,53 +575,66 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
   };
 
   render(): React.ReactNode {
-    const eventSettings: EventSettingsModel = { dataSource: this.state.items };
+    const events = this.state.items.map((item) => ({
+      id: item.Id,
+      title: item.Subject,
+      start: item.StartTime,
+      end: item.EndTime,
+      backgroundColor: item.color,
+      borderColor: item.color,
+      extendedProps: {
+        item,
+      },
+    }));
+
     return (
       <div id="scheduler" style={{ width: "100%", height: "100%" }}>
-        <ScheduleComponent
-          currentView="Month"
-          ref={this.scheduleComponent}
-          eventSettings={eventSettings}
-          actionComplete={this.handleActionComplete}
-          eventRendered={this.eventRendered}
-          editorTemplate={this.editorTemplate}
-          editorFooterTemplate={this.editorFooterTemplate}
-          editorHeaderTemplate={this.editorHeaderTemplate}
-          quickInfoTemplates={{ footer: this.quickInfoFooterTemplate.bind(this) }}
-          popupOpen={this.onPopupOpen}
-          popupClose={this.onPopupClosed}
-          enableAdaptiveUI={true}
-        >
-          <ViewsDirective>
-            <ViewDirective option="Month" />
-          </ViewsDirective>
-          <Inject services={[Week, Month, Agenda]} />
-        </ScheduleComponent>
-        Select Calendars{" "}
-        <DropDownTreeComponent
-          width="250"
-          name="calendarSelector"
-          showCheckBox={true}
-          id="calendarSelector"
-          fields={{ dataSource: this.state.allCalendars, text: "name", value: "id" }}
-          value={this.state.allCalendars.filter((c) => c.selected).map((c) => c.id)}
-          change={this.handleCalendarChange}
-          showSelectAll={true}
+        <FullCalendar
+          plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          headerToolbar={{
+            left: "prev,next today",
+            center: "title",
+            right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+          }}
+          events={events}
+          selectable={true}
+          select={this.handleDateSelect}
+          eventClick={this.handleEventClick}
+          datesSet={this.handleDatesSet}
+          eventDidMount={this.eventDidMount}
+          height={"auto"}
         />
+        <DialogComponent id="calendar-editor-dialog" isModal={true} visible={this.state.isEditorOpen} header={this.editorHeaderTemplate()} close={this.closeEditor} closeOnEscape={true} showCloseIcon={true}>
+          {this.state.editorIsLoading ? <div>Loading event...</div> : this.editorTemplate()}
+          {!this.state.editorIsLoading && this.editorFooterTemplate()}
+        </DialogComponent>
+        Select Calendars
+        <select id="calendarSelector" name="calendarSelector" multiple={true} value={this.state.allCalendars.filter((c) => c.selected).map((c) => c.id)} onChange={this.handleCalendarChange} className="summit-form-input" size={8}>
+          {this.getCalendarGroups().map((group) => (
+            <optgroup key={`calendar-${group.label}`} label={group.label}>
+              {group.options.map((option) => (
+                <option key={`calendar-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
         <DialogComponent
           id="dialog"
           isModal={true}
-          visible={false}
+          visible={!this.state.hideDialog}
           header="View Event"
           target="#scheduler"
           animationSettings={{ effect: "None" }}
           close={() => {
             $("#eventFrame").attr("src", "about:blank");
+            this.setState({ hideDialog: true });
             this.fetchData();
           }}
           closeOnEscape={true}
           showCloseIcon={true}
-          ref={(dialog: DialogComponent) => (this.dialogInstance = dialog!)}
           cssClass="summit-dialog-max-size"
           buttons={this.dialogButtons}
         >
