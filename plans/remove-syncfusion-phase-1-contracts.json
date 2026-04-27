@@ -1,26 +1,5 @@
 {
   "syncfusionImportInventory": {
-    "src/pages/MilestoneReport/components/MilestoneReport.tsx": [
-      "@syncfusion/ej2-react-grids",
-      "@syncfusion/ej2-react-navigations"
-    ],
-    "src/pages/OasReport/components/OasReport.tsx": [
-      "@syncfusion/ej2-react-grids",
-      "@syncfusion/ej2-react-navigations"
-    ],
-    "src/pages/PeakAward/components/PeakAward.tsx": [
-      "@syncfusion/ej2-react-grids",
-      "@syncfusion/ej2-react-navigations"
-    ],
-    "src/pages/PresentAwards/components/PresentAwards.tsx": [
-      "@syncfusion/ej2-base",
-      "@syncfusion/ej2-react-grids",
-      "@syncfusion/ej2-react-navigations"
-    ],
-    "src/pages/SectionSummary/components/UnitSummary.tsx": [
-      "@syncfusion/ej2-react-grids",
-      "@syncfusion/ej2-react-navigations"
-    ],
     "src/pages/SummitCalendar/components/SummitCalendar.tsx": [
       "@syncfusion/ej2-react-dropdowns",
       "@syncfusion/ej2-react-inputs",
@@ -40,7 +19,7 @@
     {
       "file": "src/pages/PresentAwards/components/PresentAwards.tsx",
       "mustContain": [
-        "<GridComponent",
+        "<DataGrid",
         "<ToastComponent",
         "<DatePickerComponent"
       ]
@@ -48,29 +27,29 @@
     {
       "file": "src/pages/MilestoneReport/components/MilestoneReport.tsx",
       "mustContain": [
-        "<GridComponent",
-        "toolbar={[\"Print\", \"PdfExport\", \"ExcelExport\"]}"
+        "<DataGrid",
+        "toolbarActions={[\"pdf\", \"excel\"]}"
       ]
     },
     {
       "file": "src/pages/OasReport/components/OasReport.tsx",
       "mustContain": [
-        "<GridComponent",
-        "toolbar={[\"Print\", \"PdfExport\", \"ExcelExport\"]}"
+        "<DataGrid",
+        "toolbarActions={[\"pdf\", \"excel\"]}"
       ]
     },
     {
       "file": "src/pages/PeakAward/components/PeakAward.tsx",
       "mustContain": [
-        "<GridComponent",
-        "toolbar={[\"Print\", \"PdfExport\", \"ExcelExport\"]}"
+        "<DataGrid",
+        "toolbarActions={[\"pdf\", \"excel\"]}"
       ]
     },
     {
       "file": "src/pages/SectionSummary/components/UnitSummary.tsx",
       "mustContain": [
-        "<GridComponent",
-        "toolbar={[\"Print\", \"PdfExport\", \"ExcelExport\"]}"
+        "<DataGrid",
+        "toolbarActions={[\"pdf\", \"excel\"]}"
       ]
     }
   ],

@@ -63,12 +63,16 @@
     "@syncfusion/ej2-react-notifications": "^28.2.3",
     "@syncfusion/ej2-react-popups": "^28.2.9",
     "@syncfusion/ej2-react-schedule": "^28.2.11",
+    "@tanstack/react-table": "^8.21.3",
     "big.js": "^6.2.2",
     "install": "^0.13.0",
     "jquery": "^3.7.1",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "moment": "^2.30.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
