@@ -1,0 +1,91 @@
+{
+  "syncfusionImportInventory": {
+    "src/pages/MilestoneReport/components/MilestoneReport.tsx": [
+      "@syncfusion/ej2-react-grids",
+      "@syncfusion/ej2-react-navigations"
+    ],
+    "src/pages/OasReport/components/OasReport.tsx": [
+      "@syncfusion/ej2-react-grids",
+      "@syncfusion/ej2-react-navigations"
+    ],
+    "src/pages/PeakAward/components/PeakAward.tsx": [
+      "@syncfusion/ej2-react-grids",
+      "@syncfusion/ej2-react-navigations"
+    ],
+    "src/pages/PresentAwards/components/PresentAwards.tsx": [
+      "@syncfusion/ej2-base",
+      "@syncfusion/ej2-react-calendars",
+      "@syncfusion/ej2-react-grids",
+      "@syncfusion/ej2-react-navigations",
+      "@syncfusion/ej2-react-notifications"
+    ],
+    "src/pages/SectionSummary/components/UnitSummary.tsx": [
+      "@syncfusion/ej2-react-grids",
+      "@syncfusion/ej2-react-navigations"
+    ],
+    "src/pages/SummitCalendar/components/SummitCalendar.tsx": [
+      "@syncfusion/ej2-react-calendars",
+      "@syncfusion/ej2-react-dropdowns",
+      "@syncfusion/ej2-react-inputs",
+      "@syncfusion/ej2-react-popups",
+      "@syncfusion/ej2-react-schedule"
+    ]
+  },
+  "baselineRenderContracts": [
+    {
+      "file": "src/pages/SummitCalendar/components/SummitCalendar.tsx",
+      "mustContain": [
+        "<ScheduleComponent",
+        "<DropDownTreeComponent",
+        "<DialogComponent",
+        "new FormValidator"
+      ]
+    },
+    {
+      "file": "src/pages/PresentAwards/components/PresentAwards.tsx",
+      "mustContain": [
+        "<GridComponent",
+        "<ToastComponent",
+        "<DatePickerComponent"
+      ]
+    },
+    {
+      "file": "src/pages/MilestoneReport/components/MilestoneReport.tsx",
+      "mustContain": [
+        "<GridComponent",
+        "toolbar={[\"Print\", \"PdfExport\", \"ExcelExport\"]}"
+      ]
+    },
+    {
+      "file": "src/pages/OasReport/components/OasReport.tsx",
+      "mustContain": [
+        "<GridComponent",
+        "toolbar={[\"Print\", \"PdfExport\", \"ExcelExport\"]}"
+      ]
+    },
+    {
+      "file": "src/pages/PeakAward/components/PeakAward.tsx",
+      "mustContain": [
+        "<GridComponent",
+        "toolbar={[\"Print\", \"PdfExport\", \"ExcelExport\"]}"
+      ]
+    },
+    {
+      "file": "src/pages/SectionSummary/components/UnitSummary.tsx",
+      "mustContain": [
+        "<GridComponent",
+        "toolbar={[\"Print\", \"PdfExport\", \"ExcelExport\"]}"
+      ]
+    }
+  ],
+  "ciLicenseGuard": {
+    "workflowPath": ".github/workflows/build.yaml",
+    "requiredWorkflowMarkers": [
+      "- name: Activate Syncfusion License",
+      "run: npx syncfusion-license activate",
+      "SYNCFUSION_LICENSE: ${{ secrets.SYNCFUSION_LICENSE }}"
+    ],
+    "packageScriptName": "licence",
+    "packageScriptContains": "syncfusion-license activate"
+  }
+}
