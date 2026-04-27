@@ -9,7 +9,7 @@ import SummitCalendarItem from "../models/SummitCalendarItems";
 import { createNewEvent, deleteEvent, fetchActivity, fetchMemberCalendars, fetchMemberEvents, fetchUnitMembers, updateEvent, updateMemberCalendars } from "@/services";
 import moment from "moment";
 import { TerrainEvent, TerrainUnitMember, TerrrainCalendarResult } from "@/types/terrainTypes";
-import { TerrainState, applyGroupedMultiSelectChange, buildGroupedMemberOptions, validateSummitCalendarActivity } from "@/helpers";
+import { TerrainState, applyGroupedMultiSelectChange, buildGroupedMemberOptions, clearSummitCalendarEditorDraft, loadSummitCalendarEditorDraft, saveSummitCalendarEditorDraft, validateSummitCalendarActivity } from "@/helpers";
 import { GroupedMultiSelectGroup } from "@/helpers/SummitCalendarValidation";
 import TerrainEventItem from "../models/TerrainEventItem";
 import { DatePickerComponent, TimePickerComponent } from "@/components/DateTimeInputs";
@@ -37,6 +37,7 @@ interface SummitCalendarState {
   calendars: TerrrainCalendarResult;
   allCalendars: { id: string; name: string; selected: boolean }[];
   currentWindow: { startDate: string; endDate: string } | null;
+  editorValidationErrors: Record<string, string>;
 }
 
 export class SummitCalendarComponent extends React.Component<SummitCalendarProps, SummitCalendarState> {
@@ -58,9 +59,72 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       calendars: {},
       allCalendars: [],
       currentWindow: null,
+      editorValidationErrors: {},
     };
     this.handleInputChange = this.handleInputChange.bind(this);
   }
+
+  buildEditorDefaults = (startDate: string, endDate: string): TerrainEvent => ({
+    title: "",
+    location: "",
+    challenge_area: "",
+    organisers: [],
+    review: {
+      scout_method_elements: [],
+    },
+    attendance: {
+      leader_members: [],
+      assistant_members: [],
+      attendee_members: [],
+    },
+    owner_type: "unit",
+    owner_id: this.state.currentUnitID,
+    start_datetime: moment(startDate).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
+    end_datetime: moment(endDate).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
+  });
+
+  focusTitleInput = () => {
+    const titleInput = document.querySelector<HTMLInputElement>('input[name="title"]');
+    titleInput?.focus();
+  };
+
+  setEditorValidationErrors = (editorValidationErrors: Record<string, string>) => {
+    this.setState({ editorValidationErrors });
+  };
+
+  persistEditorDraft = (activity: TerrainEvent) => {
+    if (activity?.id) {
+      return;
+    }
+
+    saveSummitCalendarEditorDraft(activity);
+  };
+
+  clearValidationErrorsFor = (fieldIds: string[]) => {
+    if (!fieldIds.length) {
+      return;
+    }
+
+    this.setState((prevState) => {
+      const nextErrors = { ...prevState.editorValidationErrors };
+      fieldIds.forEach((fieldId) => {
+        delete nextErrors[fieldId];
+      });
+
+      return {
+        editorValidationErrors: nextErrors,
+      };
+    });
+  };
+
+  handleEditorKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.ctrlKey || event.metaKey) {
+      if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void this.saveActivity();
+      }
+    }
+  };
 
   componentDidMount() {
     this.fetchCalendars();
@@ -137,9 +201,11 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
   };
 
   closeEditor = () => {
+    clearSummitCalendarEditorDraft();
     this.setState({
       isEditorOpen: false,
       editorIsLoading: false,
+      editorValidationErrors: {},
       activity: { start_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), end_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ") },
     });
   };
@@ -149,16 +215,18 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     if (activity) {
       activity.start_datetime = moment(activity.start_datetime).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ");
       activity.end_datetime = moment(activity.end_datetime).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ");
-      this.setState({ activity: activity, editorIsLoading: false, isEditorOpen: true });
+      this.setState({ activity: activity, editorIsLoading: false, isEditorOpen: true, editorValidationErrors: {} }, this.focusTitleInput);
     } else this.newActivity(moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"));
   };
 
   newActivity = async (startDate: string, endDate: string) => {
     const activity = {
+      ...this.buildEditorDefaults(startDate, endDate),
+      ...(loadSummitCalendarEditorDraft() ?? {}),
       start_datetime: moment(startDate).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
       end_datetime: moment(endDate).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
-    };
-    this.setState({ activity: activity, editorIsLoading: false, isEditorOpen: true });
+    } as TerrainEvent;
+    this.setState({ activity: activity, editorIsLoading: false, isEditorOpen: true, editorValidationErrors: {} }, this.focusTitleInput);
   };
 
   challangeAreas = [
@@ -181,12 +249,18 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
 
   handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
-    this.setState((prevState) => ({
-      activity: {
-        ...prevState.activity,
-        [name]: value,
+    this.setState(
+      (prevState) => ({
+        activity: {
+          ...prevState.activity,
+          [name]: value,
+        },
+      }),
+      () => {
+        this.clearValidationErrorsFor([name]);
+        this.persistEditorDraft(this.state.activity);
       },
-    }));
+    );
   };
 
   handleDateTimeChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -194,36 +268,60 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     //if name ends with time change name to be datetime and set previous values time but not date if it ends with date change name to be datetime and update the date but not the time of the previous value
     switch (name) {
       case "start_date":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            start_datetime: moment(value).utc().format("YYYY-MM-DD") + "T" + moment(prevState.activity.start_datetime).utc().format("HH:mm:ss"),
+        this.setState(
+          (prevState) => ({
+            activity: {
+              ...prevState.activity,
+              start_datetime: moment(value).utc().format("YYYY-MM-DD") + "T" + moment(prevState.activity.start_datetime).utc().format("HH:mm:ss"),
+            },
+          }),
+          () => {
+            this.clearValidationErrorsFor(["date_range"]);
+            this.persistEditorDraft(this.state.activity);
           },
-        }));
+        );
         break;
       case "start_time":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            start_datetime: moment(prevState.activity.start_datetime).utc().format("YYYY-MM-DD") + "T" + moment(value).utc().format("HH:mm:ss"),
+        this.setState(
+          (prevState) => ({
+            activity: {
+              ...prevState.activity,
+              start_datetime: moment(prevState.activity.start_datetime).utc().format("YYYY-MM-DD") + "T" + moment(value).utc().format("HH:mm:ss"),
+            },
+          }),
+          () => {
+            this.clearValidationErrorsFor(["date_range"]);
+            this.persistEditorDraft(this.state.activity);
           },
-        }));
+        );
         break;
       case "end_date":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            end_datetime: moment(value).utc().format("YYYY-MM-DD") + "T" + moment(prevState.activity.end_datetime).utc().format("HH:mm:ss"),
+        this.setState(
+          (prevState) => ({
+            activity: {
+              ...prevState.activity,
+              end_datetime: moment(value).utc().format("YYYY-MM-DD") + "T" + moment(prevState.activity.end_datetime).utc().format("HH:mm:ss"),
+            },
+          }),
+          () => {
+            this.clearValidationErrorsFor(["date_range"]);
+            this.persistEditorDraft(this.state.activity);
           },
-        }));
+        );
         break;
       case "end_time":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            end_datetime: moment(prevState.activity.end_datetime).utc().format("YYYY-MM-DD") + "T" + moment(value).utc().format("HH:mm:ss"),
+        this.setState(
+          (prevState) => ({
+            activity: {
+              ...prevState.activity,
+              end_datetime: moment(prevState.activity.end_datetime).utc().format("YYYY-MM-DD") + "T" + moment(value).utc().format("HH:mm:ss"),
+            },
+          }),
+          () => {
+            this.clearValidationErrorsFor(["date_range"]);
+            this.persistEditorDraft(this.state.activity);
           },
-        }));
+        );
         break;
     }
   };
@@ -231,20 +329,31 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
   handleSelectChange = (event: { element: { id: string }; value: string | string[] }) => {
     switch (event.element.id) {
       case "challenge_area":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            challenge_area: event.value ? event.value.toString().toLowerCase().replace(" ", "_") : "",
+        this.setState(
+          (prevState) => ({
+            activity: {
+              ...prevState.activity,
+              challenge_area: event.value ? event.value.toString().toLowerCase().replace(" ", "_") : "",
+            },
+          }),
+          () => {
+            this.clearValidationErrorsFor(["challenge_area"]);
+            this.persistEditorDraft(this.state.activity);
           },
-        }));
+        );
         break;
       default:
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            [event.element.id]: event.value,
+        this.setState(
+          (prevState) => ({
+            activity: {
+              ...prevState.activity,
+              [event.element.id]: event.value,
+            },
+          }),
+          () => {
+            this.persistEditorDraft(this.state.activity);
           },
-        }));
+        );
         break;
     }
   };
@@ -253,9 +362,15 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     const selectedValues = Array.from(event.target.selectedOptions).map((option) => option.value);
     const fieldId = event.target.id;
 
-    this.setState((prevState) => ({
-      activity: applyGroupedMultiSelectChange(prevState.activity, fieldId, selectedValues, this.state.unitMembers),
-    }));
+    this.setState(
+      (prevState) => ({
+        activity: applyGroupedMultiSelectChange(prevState.activity, fieldId, selectedValues, this.state.unitMembers),
+      }),
+      () => {
+        this.clearValidationErrorsFor([fieldId]);
+        this.persistEditorDraft(this.state.activity);
+      },
+    );
   };
 
   getScoutMethodGroups = (): GroupedMultiSelectGroup[] => {
@@ -325,20 +440,25 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     }
   };
   editorTemplate = () => {
-    const { activity, currentUnitID } = this.state;
+    const { activity, currentUnitID, editorValidationErrors } = this.state;
     const memberGroups = buildGroupedMemberOptions(this.state.unitMembers);
     const scoutMethodGroups = this.getScoutMethodGroups();
     const isEditable = (activity?.status !== "concluded" && currentUnitID === activity?.owner_id) || (activity && activity.id === undefined);
     return (
-      <div className="editor-container">
+      <div className="editor-container" data-editor-layout="compact">
         <label>
           Title <span style={{ color: "red" }}>*</span>
-          <input className="summit-form-input" type="text" name="title" value={activity?.title || ""} onChange={this.handleInputChange} disabled={!isEditable} data-msg-containerid="titleError" />
-          <div id="titleError" />
+          <input className="summit-form-input" type="text" name="title" value={activity?.title || ""} onChange={this.handleInputChange} disabled={!isEditable} data-msg-containerid="titleError" data-editor-default="title" />
+          <div id="titleError" data-editor-validation="title" role="status">
+            {editorValidationErrors.title ?? ""}
+          </div>
         </label>
         <label>
           Location <span style={{ color: "red" }}>*</span>
-          <input className="summit-form-input" type="text" name="location" value={activity?.location || ""} onChange={this.handleInputChange} disabled={!isEditable} />
+          <input className="summit-form-input" type="text" name="location" value={activity?.location || ""} onChange={this.handleInputChange} disabled={!isEditable} data-editor-default="location" />
+          <div data-editor-validation="location" role="status">
+            {editorValidationErrors.location ?? ""}
+          </div>
         </label>
         <label>
           Challenge Area <span style={{ color: "red" }}>*</span>
@@ -351,7 +471,9 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
             change={this.handleSelectChange}
             enabled={isEditable}
           />
-          <div id="caError"></div>
+          <div id="caError" data-editor-validation="challenge_area" role="status">
+            {editorValidationErrors.challenge_area ?? ""}
+          </div>
         </label>
         <label>
           Start <span style={{ color: "red" }}>*</span>
@@ -369,6 +491,9 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           End <span style={{ color: "red" }}>*</span>
           <DatePickerComponent id="end_date" value={new Date(activity?.end_datetime || new Date())} format="dd/MM/yy" onChange={this.handleDateTimeChange} name="end_date" disabled={!isEditable} showClearButton={false} />
           <TimePickerComponent id="end_time" value={new Date(activity?.end_datetime || new Date())} format="hh:mm a" onChange={this.handleDateTimeChange} name="end_time" disabled={!isEditable} showClearButton={false} />
+          <div data-editor-validation="date_range" role="status">
+            {editorValidationErrors.date_range ?? ""}
+          </div>
         </label>
         <label>
           Scout Method <span style={{ color: "red" }}>*</span>
@@ -437,21 +562,22 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     console.log(activity);
     const validationResult = validateSummitCalendarActivity(activity);
     if (!validationResult.isValid) {
-      const firstError = Object.values(validationResult.errors)[0];
-      if (firstError) {
-        alert(firstError);
-      }
+      this.setEditorValidationErrors(validationResult.errors);
       return;
     }
+
+    this.setEditorValidationErrors({});
 
     const eventToSave = new TerrainEventItem(activity);
     if (eventToSave.id) {
       await updateEvent(eventToSave.id, JSON.stringify(eventToSave));
+      clearSummitCalendarEditorDraft();
       this.setState({ isEditorOpen: false });
       this.fetchData();
     }
     if (!eventToSave.id) {
       await createNewEvent(JSON.stringify(eventToSave));
+      clearSummitCalendarEditorDraft();
       this.setState({ isEditorOpen: false });
       this.fetchData();
     }
@@ -629,7 +755,14 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           height={"auto"}
         />
         <DialogComponent id="calendar-editor-dialog" isModal={true} visible={this.state.isEditorOpen} header={this.editorHeaderTemplate()} close={this.closeEditor} closeOnEscape={true} showCloseIcon={true}>
-          <div data-editor-speed-contract="calendar-editor-speed" data-editor-open-proxy={String(this.state.isEditorOpen)} data-editor-loading-proxy={String(this.state.editorIsLoading)}>
+          <div
+            data-editor-speed-contract="calendar-editor-speed"
+            data-editor-open-proxy={String(this.state.isEditorOpen)}
+            data-editor-loading-proxy={String(this.state.editorIsLoading)}
+            data-editor-shortcuts="enabled"
+            onKeyDown={this.handleEditorKeyDown}
+            tabIndex={0}
+          >
             {this.state.editorIsLoading ? <div>Loading event...</div> : this.editorTemplate()}
             {!this.state.editorIsLoading && this.editorFooterTemplate()}
           </div>

@@ -6,3 +6,4 @@ export { processGuids, reconstructGuids, reconstructGuidsAndDates, processGuidsA
 export { default as HasPropAtPath } from "./HasPropAtPath";
 export { default as verticalText } from "./VerticleText";
 export { applyGroupedMultiSelectChange, buildGroupedMemberOptions, validateSummitCalendarActivity } from "./SummitCalendarValidation";
+export { clearSummitCalendarEditorDraft, loadSummitCalendarEditorDraft, saveSummitCalendarEditorDraft } from "./SummitCalendarDraftPersistence";
