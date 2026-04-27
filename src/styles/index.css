@@ -1,3 +1,26 @@
+:root {
+  --summit-space-xs: 4px;
+  --summit-space-sm: 8px;
+  --summit-space-md: 12px;
+  --summit-space-lg: 16px;
+
+  --summit-font-size-sm: 12px;
+  --summit-font-size-md: 14px;
+  --summit-font-weight-semibold: 600;
+
+  --summit-color-bg-primary: #004c00;
+  --summit-color-bg-primary-hover: #006600;
+  --summit-color-bg-muted: #f3f2f1;
+  --summit-color-bg-surface: #ffffff;
+  --summit-color-text-primary: #201f1e;
+  --summit-color-text-on-primary: #ffffff;
+  --summit-color-border-default: #c8c6c4;
+  --summit-color-border-subtle: #edebe9;
+
+  --summit-focus-ring-color: #0f6cbd;
+  --summit-focus-ring-width: 2px;
+}
+
 .editor-container {
   display: flex;
   flex-direction: column;
@@ -21,30 +44,41 @@
 
 .summit-form-input {
   width: 100%;
-  padding: 6px 10px;
-  border: 1px solid #c8c6c4;
+  padding: calc(var(--summit-space-sm) - 2px) calc(var(--summit-space-md) - 2px);
+  border: 1px solid var(--summit-color-border-default);
   border-radius: 4px;
   box-sizing: border-box;
+  color: var(--summit-color-text-primary);
+  background: var(--summit-color-bg-surface);
+  font-size: var(--summit-font-size-md);
 }
 
 .summit-button {
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  margin-left: 8px;
-  padding: 8px 12px;
+  margin-left: var(--summit-space-sm);
+  padding: var(--summit-space-sm) var(--summit-space-md);
+  font-size: var(--summit-font-size-md);
+  font-weight: var(--summit-font-weight-semibold);
+}
+
+.summit-button:focus-visible,
+.summit-form-input:focus-visible {
+  outline: var(--summit-focus-ring-width) solid var(--summit-focus-ring-color);
+  outline-offset: 2px;
 }
 
 .summit-button-primary {
-  background: #004C00;
-  border-color: #004C00;
-  color: #ffffff;
+  background: var(--summit-color-bg-primary);
+  border-color: var(--summit-color-bg-primary);
+  color: var(--summit-color-text-on-primary);
 }
 
 .summit-button-secondary {
-  background: #f3f2f1;
-  border-color: #d2d0ce;
-  color: #201f1e;
+  background: var(--summit-color-bg-muted);
+  border-color: var(--summit-color-border-default);
+  color: var(--summit-color-text-primary);
 }
 
 .summit-button-danger {
@@ -56,9 +90,9 @@
 .calendar-ux-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--summit-space-md);
   align-items: center;
-  margin: 12px 0;
+  margin: var(--summit-space-md) 0;
 }
 
 .calendar-quick-filters {
@@ -67,8 +101,8 @@
 }
 
 .calendar-range-context {
-  font-weight: 600;
-  color: #004c00;
+  font-weight: var(--summit-font-weight-semibold);
+  color: var(--summit-color-bg-primary);
 }
 
 .calendar-legend {
@@ -82,8 +116,8 @@
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  font-size: 12px;
-  color: #201f1e;
+  font-size: var(--summit-font-size-sm);
+  color: var(--summit-color-text-primary);
 }
 
 .calendar-legend-swatch {
@@ -95,48 +129,50 @@
 }
 
 .calendar-selector-panel {
-  margin-top: 16px;
-  padding: 12px;
-  border: 1px solid #d2d0ce;
+  margin-top: var(--summit-space-lg);
+  padding: var(--summit-space-md);
+  border: 1px solid var(--summit-color-border-default);
   border-radius: 6px;
   background: #faf9f8;
 }
 
 .calendar-selector-panel label {
   display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
+  margin-bottom: var(--summit-space-sm);
+  font-weight: var(--summit-font-weight-semibold);
 }
 
 .data-grid-container {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--summit-space-sm);
 }
 
+.data-grid-toolbar,
 .data-grid-filters,
 .data-grid-pagination {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--summit-space-sm);
   flex-wrap: wrap;
 }
 
 .data-grid-filter-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #201f1e;
+  font-size: var(--summit-font-size-sm);
+  font-weight: var(--summit-font-weight-semibold);
+  color: var(--summit-color-text-primary);
 }
 
 .data-grid-table {
   width: 100%;
   border-collapse: collapse;
+  background: var(--summit-color-bg-surface);
 }
 
 .data-grid-table th,
 .data-grid-table td {
-  padding: 6px 8px;
-  border-bottom: 1px solid #edebe9;
+  padding: calc(var(--summit-space-sm) - 2px) var(--summit-space-sm);
+  border-bottom: 1px solid var(--summit-color-border-subtle);
 }
 
 .data-grid-sort-indicator {
@@ -144,8 +180,35 @@
 }
 
 .data-grid-export-feedback {
-  font-size: 12px;
-  color: #004c00;
+  font-size: var(--summit-font-size-sm);
+  color: var(--summit-color-bg-primary);
+}
+
+.summit-dialog-surface {
+  background: var(--summit-color-bg-surface);
+  border: 1px solid var(--summit-color-border-default);
+  border-radius: 8px;
+  min-width: 320px;
+  min-height: 200px;
+  width: 80%;
+  height: 80%;
+  padding: var(--summit-space-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.summit-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--summit-space-sm);
+}
+
+.summit-dialog-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: var(--summit-font-weight-semibold);
+  color: var(--summit-color-text-primary);
 }
 
 nav:has(* a[href*="/terrain"]),

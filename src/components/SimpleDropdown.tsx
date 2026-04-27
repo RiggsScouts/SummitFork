@@ -26,6 +26,7 @@ export const DropDownListComponent: React.FC<DropDownListProps> = ({ id, name, d
     <select
       id={id}
       name={name}
+      className="summit-form-input"
       value={value ?? ""}
       disabled={!enabled}
       onChange={(event) => {

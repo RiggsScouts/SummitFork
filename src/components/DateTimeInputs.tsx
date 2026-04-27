@@ -41,9 +41,9 @@ const toTimeValue = (value?: Date) => {
 };
 
 export const DatePickerComponent: React.FC<DatePickerProps> = ({ id, name, value, onChange, disabled, onFocus }) => {
-  return <input id={id} name={name} type="date" value={toDateValue(value)} onChange={onChange} disabled={disabled} onFocus={onFocus} />;
+  return <input id={id} name={name} className="summit-form-input" type="date" value={toDateValue(value)} onChange={onChange} disabled={disabled} onFocus={onFocus} />;
 };
 
 export const TimePickerComponent: React.FC<TimePickerProps> = ({ id, name, value, onChange, disabled, onFocus }) => {
-  return <input id={id} name={name} type="time" value={toTimeValue(value)} onChange={onChange} disabled={disabled} onFocus={onFocus} />;
+  return <input id={id} name={name} className="summit-form-input" type="time" value={toTimeValue(value)} onChange={onChange} disabled={disabled} onFocus={onFocus} />;
 };

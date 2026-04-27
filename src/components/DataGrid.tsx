@@ -307,11 +307,11 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
       </div>
 
       {(toolbarActions.length > 0 || rightActions.length > 0) && (
-        <div className="data-grid-toolbar" style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+        <div className="data-grid-toolbar" style={{ marginBottom: 8 }}>
           {leftActions.map((action) => {
             if (action === "excel") {
               return (
-                <button key="excel" type="button" data-action="excel-export" onClick={handleExcelExport}>
+                <button key="excel" type="button" data-action="excel-export" className="summit-button summit-button-secondary" onClick={handleExcelExport}>
                   Excel Export
                 </button>
               );
@@ -319,14 +319,14 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
 
             if (action === "pdf") {
               return (
-                <button key="pdf" type="button" data-action="pdf-export" onClick={handlePdfExport}>
+                <button key="pdf" type="button" data-action="pdf-export" className="summit-button summit-button-secondary" onClick={handlePdfExport}>
                   PDF Export
                 </button>
               );
             }
 
             return (
-              <button key={action.id} type="button" data-action={action.id} onClick={action.onClick}>
+              <button key={action.id} type="button" data-action={action.id} className="summit-button summit-button-secondary" onClick={action.onClick}>
                 {action.label}
               </button>
             );
@@ -335,7 +335,7 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
           {rightActions.length > 0 && <div style={{ marginLeft: "auto" }} />}
 
           {rightActions.map((action) => (
-            <button key={action.id} type="button" data-action={action.id} onClick={action.onClick}>
+            <button key={action.id} type="button" data-action={action.id} className="summit-button summit-button-secondary" onClick={action.onClick}>
               {action.label}
             </button>
           ))}
@@ -362,6 +362,7 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
                     {canSort ? (
                       <button
                         type="button"
+                        className="summit-button summit-button-secondary"
                         onClick={header.column.getToggleSortingHandler()}
                         aria-label={`Sort by ${String(header.column.columnDef.header)}, currently ${sortState === "asc" ? "ascending" : sortState === "desc" ? "descending" : "not sorted"}`}
                       >
@@ -423,19 +424,19 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
       </table>
 
       <div className="data-grid-pagination" aria-label="Data grid pagination">
-        <button type="button" data-grid-page="previous" onClick={handlePreviousPage} disabled={pageIndex === 0}>
+        <button type="button" data-grid-page="previous" className="summit-button summit-button-secondary" onClick={handlePreviousPage} disabled={pageIndex === 0}>
           Previous
         </button>
         <span data-grid-page-indicator="true">
           Page {pageIndex + 1} of {pageCount}
         </span>
-        <button type="button" data-grid-page="next" onClick={handleNextPage} disabled={pageIndex >= pageCount - 1}>
+        <button type="button" data-grid-page="next" className="summit-button summit-button-secondary" onClick={handleNextPage} disabled={pageIndex >= pageCount - 1}>
           Next
         </button>
         <label htmlFor={`${id}-page-size`} className="data-grid-filter-label">
           Rows per page
         </label>
-        <select id={`${id}-page-size`} data-grid-page-size="true" value={String(pageSize)} onChange={handlePageSizeChange}>
+        <select id={`${id}-page-size`} data-grid-page-size="true" className="summit-form-input" value={String(pageSize)} onChange={handlePageSizeChange}>
           {pageSizeOptions.map((option) => (
             <option key={option} value={String(option)}>
               {option}

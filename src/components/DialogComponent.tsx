@@ -67,13 +67,15 @@ export const DialogComponent = forwardRef<DialogHandle, DialogComponentProps>(({
     return null;
   }
 
+  const containerClassName = [cssClass].filter(Boolean).join(" ");
+
   return (
-    <div id={id} className={cssClass} role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "white", minWidth: 320, minHeight: 200, width: "80%", height: "80%", padding: 12, display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <h3 style={{ margin: 0 }}>{header}</h3>
+    <div id={id} className={containerClassName} role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="summit-dialog-surface">
+        <div className="summit-dialog-header">
+          <h3 className="summit-dialog-title">{header}</h3>
           {showCloseIcon && (
-            <button type="button" data-dialog-close="true" onClick={handleClose}>
+            <button type="button" className="summit-button summit-button-secondary" data-dialog-close="true" onClick={handleClose}>
               ×
             </button>
           )}
