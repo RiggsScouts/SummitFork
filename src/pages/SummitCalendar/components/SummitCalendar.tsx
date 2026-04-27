@@ -4,9 +4,9 @@ import SummitCalendarItem from "../models/SummitCalendarItems";
 import { createNewEvent, deleteEvent, fetchActivity, fetchMemberCalendars, fetchMemberEvents, fetchUnitMembers, updateEvent, updateMemberCalendars } from "@/services";
 import moment from "moment";
 import { TerrainEvent, TerrainEventSummary, TerrainUnitMember, TerrrainCalendarResult } from "@/types/terrainTypes";
-import { DdtChangeEventArgs, DropDownTreeComponent } from "@syncfusion/ej2-react-dropdowns";
-import { TerrainState } from "@/helpers";
-import { FormValidator, FormValidatorModel, TextBoxComponent } from "@syncfusion/ej2-react-inputs";
+import { TerrainState, applyGroupedMultiSelectChange, buildGroupedMemberOptions, validateSummitCalendarActivity } from "@/helpers";
+import { GroupedMultiSelectGroup } from "@/helpers/SummitCalendarValidation";
+import { TextBoxComponent } from "@syncfusion/ej2-react-inputs";
 //import { enableRipple } from "@syncfusion/ej2-base";
 import TerrainEventItem from "../models/TerrainEventItem";
 import { DatePickerComponent, TimePickerComponent } from "@/components/DateTimeInputs";
@@ -216,86 +216,8 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     }
   };
 
-  handleTreeChange = (event: DdtChangeEventArgs | { element: { id: string }; value: string | string[] }) => {
-    const selectedValues = Array.isArray(event.value) ? event.value : event.value ? [event.value] : [];
+  handleSelectChange = (event: { element: { id: string }; value: string | string[] }) => {
     switch (event.element.id) {
-      case "organisers":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            organisers: selectedValues.length
-              ? this.state.unitMembers
-                  .filter((um) => {
-                    return selectedValues.includes(um.id);
-                  })
-                  .map((um) => {
-                    return {
-                      id: um.id,
-                      first_name: um.first_name,
-                      last_name: um.last_name,
-                    };
-                  })
-              : [],
-          },
-        }));
-        break;
-      case "leader_members":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            attendance: {
-              ...prevState.activity?.attendance,
-              leader_members: selectedValues.length
-                ? this.state.unitMembers
-                    .filter((um) => {
-                      return selectedValues.includes(um.id);
-                    })
-                    .map((um) => {
-                      return {
-                        id: um.id,
-                        first_name: um.first_name,
-                        last_name: um.last_name,
-                      };
-                    })
-                : [],
-            },
-          },
-        }));
-        break;
-      case "assistant_members":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            attendance: {
-              ...prevState.activity?.attendance,
-              assistant_members: selectedValues.length
-                ? this.state.unitMembers
-                    .filter((um) => {
-                      return selectedValues.includes(um.id);
-                    })
-                    .map((um) => {
-                      return {
-                        id: um.id,
-                        first_name: um.first_name,
-                        last_name: um.last_name,
-                      };
-                    })
-                : [],
-            },
-          },
-        }));
-        break;
-      case "scout_method_elements":
-        this.setState((prevState) => ({
-          activity: {
-            ...prevState.activity,
-            review: {
-              ...prevState.activity?.review,
-              scout_method_elements: selectedValues,
-            },
-          },
-        }));
-        break;
       case "challenge_area":
         this.setState((prevState) => ({
           activity: {
@@ -313,6 +235,65 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
         }));
         break;
     }
+  };
+
+  handleGroupedMultiSelectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedValues = Array.from(event.target.selectedOptions).map((option) => option.value);
+    const fieldId = event.target.id;
+
+    this.setState((prevState) => ({
+      activity: applyGroupedMultiSelectChange(prevState.activity, fieldId, selectedValues, this.state.unitMembers),
+    }));
+  };
+
+  getScoutMethodGroups = (): GroupedMultiSelectGroup[] => {
+    const programDesignValues = ["symbolic_framework", "community_involvement", "learn_by_doing", "nature_and_outdoors"];
+    const leadershipValues = ["patrol_system", "youth_leading_adult_supporting", "promise_and_law", "personal_progression"];
+
+    return [
+      {
+        label: "Program Design",
+        options: this.scoutMethodOptions.filter((option) => programDesignValues.includes(option.value)).map((option) => ({ label: option.text, value: option.value })),
+      },
+      {
+        label: "Leadership and Values",
+        options: this.scoutMethodOptions.filter((option) => leadershipValues.includes(option.value)).map((option) => ({ label: option.text, value: option.value })),
+      },
+    ];
+  };
+
+  getCalendarGroups = (): GroupedMultiSelectGroup[] => {
+    const ownCalendars = this.state.calendars.own_calendars ?? [];
+    const otherCalendars = this.state.calendars.other_calendars ?? [];
+
+    return [
+      {
+        label: "My Calendars",
+        options: ownCalendars.map((calendar) => ({ label: calendar.title, value: calendar.id })),
+      },
+      {
+        label: "Other Calendars",
+        options: otherCalendars.map((calendar) => ({ label: calendar.title, value: calendar.id })),
+      },
+    ];
+  };
+
+  renderGroupedMultiSelect = (id: string, groups: GroupedMultiSelectGroup[], value: string[], disabled: boolean = false) => {
+    const optionCount = groups.reduce((count, group) => count + group.options.length, 0);
+
+    return (
+      <select id={id} name={id} multiple={true} value={value} onChange={this.handleGroupedMultiSelectChange} disabled={disabled} className="e-input" size={Math.min(Math.max(optionCount, 4), 10)}>
+        {groups.map((group) => (
+          <optgroup key={`${id}-${group.label}`} label={group.label}>
+            {group.options.map((option) => (
+              <option key={`${id}-${group.label}-${option.value}`} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    );
   };
 
   editorHeaderTemplate = () => {
@@ -334,7 +315,9 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
   editorTemplate = (props: SummitCalendarItem) => {
     console.log("editorTemplate Opened");
     console.log(this.state.activity);
-    const { activity, members, currentUnitID } = this.state;
+    const { activity, currentUnitID } = this.state;
+    const memberGroups = buildGroupedMemberOptions(this.state.unitMembers);
+    const scoutMethodGroups = this.getScoutMethodGroups();
     const isEditable = (activity?.status !== "concluded" && currentUnitID === activity?.owner_id) || (activity && activity.id === undefined);
     return props !== undefined ? (
       <div className="editor-container">
@@ -355,7 +338,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
             dataSource={this.challangeAreas}
             value={this.state.activity?.challenge_area}
             text={this.challangeAreas.find((c) => c.value == this.state.activity?.challenge_area)?.text}
-            change={this.handleTreeChange}
+            change={this.handleSelectChange}
             enabled={isEditable}
           />
           <div id="caError"></div>
@@ -380,15 +363,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
         <label>
           Scout Method <span style={{ color: "red" }}>*</span>
           {isEditable ? (
-            <DropDownTreeComponent
-              name="scout_method_elements"
-              showCheckBox={true}
-              id="scout_method_elements"
-              fields={{ dataSource: this.scoutMethodOptions, text: "text", value: "value" }}
-              value={this.state.activity?.review?.scout_method_elements}
-              change={this.handleTreeChange}
-              enabled={isEditable}
-            />
+            this.renderGroupedMultiSelect("scout_method_elements", scoutMethodGroups, this.state.activity?.review?.scout_method_elements ?? [], !isEditable)
           ) : (
             <input
               className="e-input"
@@ -404,17 +379,14 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
         <label>
           Organisers <span style={{ color: "red" }}>*</span>
           {isEditable ? (
-            <DropDownTreeComponent
-              showCheckBox={true}
-              name="organisers"
-              id="organisers"
-              fields={{ dataSource: members, text: "text", value: "value" }}
-              value={this.state.activity?.organisers?.map((i) => {
+            this.renderGroupedMultiSelect(
+              "organisers",
+              memberGroups,
+              this.state.activity?.organisers?.map((i) => {
                 return typeof i === "object" ? i.id : "";
-              })}
-              change={this.handleTreeChange}
-              enabled={isEditable}
-            />
+              }) ?? [],
+              !isEditable,
+            )
           ) : (
             <input className="e-input" type="text" name="organisers" value={activity?.organisers?.map((i) => i.first_name + " " + i.last_name).join(", ")} disabled={true} />
           )}
@@ -422,34 +394,28 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
         <label>
           Leads
           {isEditable ? (
-            <DropDownTreeComponent
-              name="leader_members"
-              showCheckBox={true}
-              id="leader_members"
-              fields={{ dataSource: members, text: "text", value: "value" }}
-              value={this.state.activity?.attendance?.leader_members?.map((i) => {
+            this.renderGroupedMultiSelect(
+              "leader_members",
+              memberGroups,
+              this.state.activity?.attendance?.leader_members?.map((i) => {
                 return typeof i === "object" ? i.id : "";
-              })}
-              change={this.handleTreeChange}
-              enabled={isEditable}
-            />
+              }) ?? [],
+              !isEditable,
+            )
           ) : (
             <input className="e-input" type="text" name="leads" value={activity?.attendance?.leader_members?.map((i) => i.first_name + " " + i.last_name).join(", ")} disabled={true} />
           )}
         </label>
         <label>
           Assists
-          <DropDownTreeComponent
-            name="assistant_members"
-            showCheckBox={true}
-            id="assistant_members"
-            fields={{ dataSource: members, text: "text", value: "value" }}
-            value={this.state.activity?.attendance?.assistant_members?.map((i) => {
+          {this.renderGroupedMultiSelect(
+            "assistant_members",
+            memberGroups,
+            this.state.activity?.attendance?.assistant_members?.map((i) => {
               return i?.id ?? "";
-            })}
-            change={this.handleTreeChange}
-            enabled={isEditable}
-          />
+            }) ?? [],
+            !isEditable,
+          )}
         </label>
       </div>
     ) : (
@@ -461,31 +427,15 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     const { activity } = this.state;
     if (!activity) return;
     console.log(activity);
-    const options: FormValidatorModel = {
-      rules: {
-        title: { required: true },
-        location: { required: true },
-        challenge_area: { required: true },
-        scout_method_elements: { required: true },
-        organisers: { required: true },
-        start_date: { required: true },
-        end_date: { required: true },
-        start_time: { required: true },
-        end_time: { required: true },
-      },
-    };
-    const formObject = new FormValidator(".editor-container", options);
-    if (!formObject.validate()) {
+    const validationResult = validateSummitCalendarActivity(activity);
+    if (!validationResult.isValid) {
+      const firstError = Object.values(validationResult.errors)[0];
+      if (firstError) {
+        alert(firstError);
+      }
       return;
     }
-    if (this.state.activity?.attendance?.leader_members?.some((lm) => this.state.activity?.attendance?.assistant_members?.some((am) => lm.id === am.id))) {
-      alert("A member can't both be a leader and an assistant at the same time");
-      return;
-    }
-    if (this.state.activity?.start_datetime && this.state.activity?.end_datetime && moment(this.state.activity?.start_datetime).isSameOrAfter(this.state.activity?.end_datetime)) {
-      alert("Start date can't be after end date");
-      return;
-    }
+
     const eventToSave = new TerrainEventItem(activity);
     if (eventToSave.id) {
       await updateEvent(eventToSave.id, JSON.stringify(eventToSave));
@@ -653,9 +603,8 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     },
   ];
 
-  handleCalendarChange = (event: DdtChangeEventArgs) => {
-    if (!event.isInteracted) return;
-    const selectedCalendars = event.value as string[];
+  handleCalendarChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedCalendars = Array.from(event.target.selectedOptions).map((option) => option.value);
     const calendarUpdate = this.state.calendars;
     if (!calendarUpdate.own_calendars) return;
     calendarUpdate.own_calendars = calendarUpdate.own_calendars.map((calendar) => {
@@ -691,16 +640,17 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           <Inject services={[Week, Month, Agenda]} />
         </ScheduleComponent>
         Select Calendars{" "}
-        <DropDownTreeComponent
-          width="250"
-          name="calendarSelector"
-          showCheckBox={true}
-          id="calendarSelector"
-          fields={{ dataSource: this.state.allCalendars, text: "name", value: "id" }}
-          value={this.state.allCalendars.filter((c) => c.selected).map((c) => c.id)}
-          change={this.handleCalendarChange}
-          showSelectAll={true}
-        />
+        <select id="calendarSelector" name="calendarSelector" multiple={true} value={this.state.allCalendars.filter((c) => c.selected).map((c) => c.id)} onChange={this.handleCalendarChange} className="e-input" size={8}>
+          {this.getCalendarGroups().map((group) => (
+            <optgroup key={`calendar-${group.label}`} label={group.label}>
+              {group.options.map((option) => (
+                <option key={`calendar-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
         <DialogComponent
           id="dialog"
           isModal={true}

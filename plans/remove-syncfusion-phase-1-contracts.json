@@ -1,7 +1,6 @@
 {
   "syncfusionImportInventory": {
     "src/pages/SummitCalendar/components/SummitCalendar.tsx": [
-      "@syncfusion/ej2-react-dropdowns",
       "@syncfusion/ej2-react-inputs",
       "@syncfusion/ej2-react-schedule"
     ]
@@ -11,9 +10,10 @@
       "file": "src/pages/SummitCalendar/components/SummitCalendar.tsx",
       "mustContain": [
         "<ScheduleComponent",
-        "<DropDownTreeComponent",
+        "renderGroupedMultiSelect(",
+        "<optgroup",
         "<DialogComponent",
-        "new FormValidator"
+        "validateSummitCalendarActivity"
       ]
     },
     {

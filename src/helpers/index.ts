@@ -5,3 +5,4 @@ import { processGuids, reconstructGuids, reconstructGuidsAndDates, processGuidsA
 export { processGuids, reconstructGuids, reconstructGuidsAndDates, processGuidsAndDates };
 export { default as HasPropAtPath } from "./HasPropAtPath";
 export { default as verticalText } from "./VerticleText";
+export { applyGroupedMultiSelectChange, buildGroupedMemberOptions, validateSummitCalendarActivity } from "./SummitCalendarValidation";
