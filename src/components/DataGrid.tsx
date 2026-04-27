@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ColumnDef, SortingState, flexRender, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
 import { exportGridToExcel, exportGridToPdf, GridExportColumn, GridExportRow } from "@/components/gridExport";
 
@@ -26,6 +26,7 @@ export interface DataGridColumn<TData extends object> {
   accessorFn?: (row: TData) => unknown;
   cell?: (row: TData) => React.ReactNode;
   enableSorting?: boolean;
+  enableColumnFilter?: boolean;
   sortingFn?: (left: TData, right: TData) => number;
   exportValue?: (row: TData) => unknown;
   exportHeader?: string;
@@ -38,7 +39,25 @@ export interface DataGridProps<TData extends object> {
   columns: DataGridColumn<TData>[];
   toolbarActions?: Array<DataGridToolbarAction | DataGridCustomToolbarAction>;
   exportOptions?: DataGridExportOptions<TData>;
+  pageSizeOptions?: number[];
 }
+
+const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50];
+
+const toFilterValue = (value: unknown): string => {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item))
+      .join(" ")
+      .toLowerCase();
+  }
+
+  return String(value).toLowerCase();
+};
 
 const isCustomAction = (action: DataGridToolbarAction | DataGridCustomToolbarAction): action is DataGridCustomToolbarAction => {
   return typeof action !== "string";
@@ -74,8 +93,61 @@ const buildExportColumns = <TData extends object>(columns: DataGridColumn<TData>
     .filter((column) => typeof column.exportValue === "function");
 };
 
-export const DataGrid = <TData extends object>({ id, data, columns, toolbarActions = [], exportOptions }: DataGridProps<TData>) => {
+export const DataGrid = <TData extends object>({ id, data, columns, toolbarActions = [], exportOptions, pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS }: DataGridProps<TData>) => {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(pageSizeOptions[0] ?? DEFAULT_PAGE_SIZE_OPTIONS[0]);
+  const [exportFeedback, setExportFeedback] = useState("");
+
+  useEffect(() => {
+    const initialPageSize = pageSizeOptions[0] ?? DEFAULT_PAGE_SIZE_OPTIONS[0];
+    setPageSize(initialPageSize);
+    setPageIndex(0);
+  }, [pageSizeOptions]);
+
+  const filterableColumns = useMemo(() => {
+    return columns.filter((column) => {
+      if (column.enableColumnFilter === false) {
+        return false;
+      }
+
+      return typeof column.accessorFn === "function" || Boolean(column.accessorKey);
+    });
+  }, [columns]);
+
+  const filteredData = useMemo(() => {
+    const globalNeedle = globalFilter.trim().toLowerCase();
+
+    return data.filter((row) => {
+      const matchesGlobal =
+        globalNeedle.length === 0 ||
+        filterableColumns.some((column) => {
+          const rawValue = column.accessorFn ? column.accessorFn(row) : column.accessorKey ? (row as Record<string, unknown>)[column.accessorKey] : "";
+          return toFilterValue(rawValue).includes(globalNeedle);
+        });
+
+      if (!matchesGlobal) {
+        return false;
+      }
+
+      return Object.entries(columnFilters).every(([columnId, needle]) => {
+        const normalizedNeedle = needle.trim().toLowerCase();
+        if (normalizedNeedle.length === 0) {
+          return true;
+        }
+
+        const column = filterableColumns.find((item) => item.id === columnId);
+        if (!column) {
+          return true;
+        }
+
+        const rawValue = column.accessorFn ? column.accessorFn(row) : column.accessorKey ? (row as Record<string, unknown>)[column.accessorKey] : "";
+        return toFilterValue(rawValue).includes(normalizedNeedle);
+      });
+    });
+  }, [columnFilters, data, filterableColumns, globalFilter]);
 
   const tableColumns = useMemo(() => {
     return columns.map((column) => {
@@ -108,7 +180,7 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
   }, [columns]);
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns: tableColumns,
     state: {
       sorting,
@@ -117,6 +189,20 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
+
+  const sortedRows = table.getRowModel().rows;
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+
+  useEffect(() => {
+    if (pageIndex > pageCount - 1) {
+      setPageIndex(Math.max(pageCount - 1, 0));
+    }
+  }, [pageCount, pageIndex]);
+
+  const pagedRows = useMemo(() => {
+    const start = pageIndex * pageSize;
+    return sortedRows.slice(start, start + pageSize);
+  }, [pageIndex, pageSize, sortedRows]);
 
   const resolvedExportColumns = useMemo(() => {
     if (!exportOptions) {
@@ -143,12 +229,18 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
       return;
     }
 
-    exportGridToExcel({
-      fileName: `${exportOptions.fileNamePrefix}.xlsx`,
-      title: exportOptions.title,
-      rows: mappedRows,
-      columns: resolvedExportColumns,
-    });
+    try {
+      exportGridToExcel({
+        fileName: `${exportOptions.fileNamePrefix}.xlsx`,
+        title: exportOptions.title,
+        rows: mappedRows,
+        columns: resolvedExportColumns,
+      });
+      setExportFeedback("Excel export complete");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      setExportFeedback(`Excel export failed: ${message}`);
+    }
   };
 
   const handlePdfExport = () => {
@@ -156,22 +248,66 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
       return;
     }
 
-    exportGridToPdf({
-      fileName: `${exportOptions.fileNamePrefix}.pdf`,
-      title: exportOptions.title,
-      rows: mappedRows,
-      columns: resolvedExportColumns,
-      orientation: exportOptions.orientation,
-    });
+    try {
+      exportGridToPdf({
+        fileName: `${exportOptions.fileNamePrefix}.pdf`,
+        title: exportOptions.title,
+        rows: mappedRows,
+        columns: resolvedExportColumns,
+        orientation: exportOptions.orientation,
+      });
+      setExportFeedback("PDF export complete");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      setExportFeedback(`PDF export failed: ${message}`);
+    }
   };
 
   const leftActions = toolbarActions.filter((action) => !isCustomAction(action) || action.align !== "right");
   const rightActions = toolbarActions.filter((action) => isCustomAction(action) && action.align === "right") as DataGridCustomToolbarAction[];
 
+  const handleGlobalFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setGlobalFilter(event.target.value);
+    setPageIndex(0);
+  };
+
+  const handleGlobalFilterInput = (event: React.FormEvent<HTMLInputElement>) => {
+    setGlobalFilter(event.currentTarget.value);
+    setPageIndex(0);
+  };
+
+  const handleColumnFilterChange = (columnId: string, value: string) => {
+    setColumnFilters((current) => ({
+      ...current,
+      [columnId]: value,
+    }));
+    setPageIndex(0);
+  };
+
+  const handlePreviousPage = () => {
+    setPageIndex((current) => Math.max(current - 1, 0));
+  };
+
+  const handleNextPage = () => {
+    setPageIndex((current) => Math.min(current + 1, pageCount - 1));
+  };
+
+  const handlePageSizeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setPageSize(Number(event.target.value));
+    setPageIndex(0);
+  };
+
   return (
-    <div id={id}>
+    <div id={id} className="data-grid-container">
+      <div className="data-grid-filters" aria-label="Data grid filters">
+        <label htmlFor={`${id}-global-filter`} className="data-grid-filter-label">
+          Search all columns
+        </label>
+        <input id={`${id}-global-filter`} data-grid-global-filter="true" className="summit-form-input" type="text" value={globalFilter} onChange={handleGlobalFilterChange} onInput={handleGlobalFilterInput} placeholder="Filter rows..." />
+      </div>
+
       {(toolbarActions.length > 0 || rightActions.length > 0) && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+        <div className="data-grid-toolbar" style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
           {leftActions.map((action) => {
             if (action === "excel") {
               return (
@@ -206,7 +342,13 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
         </div>
       )}
 
-      <table>
+      {exportFeedback && (
+        <div data-grid-export-feedback="true" role="status" className="data-grid-export-feedback">
+          {exportFeedback}
+        </div>
+      )}
+
+      <table className="data-grid-table">
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
@@ -218,9 +360,15 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
                 return (
                   <th key={header.id} aria-sort={canSort ? ariaSort : undefined}>
                     {canSort ? (
-                      <button type="button" onClick={header.column.getToggleSortingHandler()}>
+                      <button
+                        type="button"
+                        onClick={header.column.getToggleSortingHandler()}
+                        aria-label={`Sort by ${String(header.column.columnDef.header)}, currently ${sortState === "asc" ? "ascending" : sortState === "desc" ? "descending" : "not sorted"}`}
+                      >
                         {flexRender(header.column.columnDef.header, header.getContext())}
-                        <span data-grid-sort-indicator={header.id}>{sortState === "asc" ? " ▲" : sortState === "desc" ? " ▼" : ""}</span>
+                        <span data-grid-sort-indicator={header.id} className="data-grid-sort-indicator">
+                          {sortState === "asc" ? " ▲" : sortState === "desc" ? " ▼" : " ↕"}
+                        </span>
                       </button>
                     ) : (
                       flexRender(header.column.columnDef.header, header.getContext())
@@ -230,16 +378,40 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
               })}
             </tr>
           ))}
+          {filterableColumns.length > 0 && (
+            <tr>
+              {table.getAllLeafColumns().map((leafColumn) => {
+                const dataGridColumn = columns.find((column) => column.id === leafColumn.id);
+                const canFilter = Boolean(dataGridColumn) && dataGridColumn?.enableColumnFilter !== false && (Boolean(dataGridColumn?.accessorKey) || Boolean(dataGridColumn?.accessorFn));
+
+                return (
+                  <th key={`${leafColumn.id}-filter`}>
+                    {canFilter ? (
+                      <input
+                        type="text"
+                        className="summit-form-input"
+                        placeholder={`Filter ${leafColumn.id}`}
+                        data-grid-column-filter={leafColumn.id}
+                        value={columnFilters[leafColumn.id] ?? ""}
+                        onChange={(event) => handleColumnFilterChange(leafColumn.id, event.target.value)}
+                        onInput={(event) => handleColumnFilterChange(leafColumn.id, event.currentTarget.value)}
+                      />
+                    ) : null}
+                  </th>
+                );
+              })}
+            </tr>
+          )}
         </thead>
         <tbody>
-          {table.getRowModel().rows.length === 0 ? (
+          {pagedRows.length === 0 ? (
             <tr>
               <td colSpan={Math.max(table.getAllLeafColumns().length, 1)} data-grid-empty-state="true">
                 No rows to display
               </td>
             </tr>
           ) : (
-            table.getRowModel().rows.map((row) => (
+            pagedRows.map((row) => (
               <tr key={row.id}>
                 {row.getVisibleCells().map((cell) => (
                   <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
@@ -249,6 +421,28 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
           )}
         </tbody>
       </table>
+
+      <div className="data-grid-pagination" aria-label="Data grid pagination">
+        <button type="button" data-grid-page="previous" onClick={handlePreviousPage} disabled={pageIndex === 0}>
+          Previous
+        </button>
+        <span data-grid-page-indicator="true">
+          Page {pageIndex + 1} of {pageCount}
+        </span>
+        <button type="button" data-grid-page="next" onClick={handleNextPage} disabled={pageIndex >= pageCount - 1}>
+          Next
+        </button>
+        <label htmlFor={`${id}-page-size`} className="data-grid-filter-label">
+          Rows per page
+        </label>
+        <select id={`${id}-page-size`} data-grid-page-size="true" value={String(pageSize)} onChange={handlePageSizeChange}>
+          {pageSizeOptions.map((option) => (
+            <option key={option} value={String(option)}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 };

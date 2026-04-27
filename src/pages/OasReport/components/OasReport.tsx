@@ -77,6 +77,7 @@ export function OasReportTable(props: OasReportTableProps): React.ReactNode {
       data={props.items}
       columns={columns}
       toolbarActions={["pdf", "excel"]}
+      pageSizeOptions={[10, 25, 50, 100]}
       exportOptions={{
         fileNamePrefix: "OASReport",
         title: "Terrain | Summit - OAS Report",
