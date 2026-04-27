@@ -25,6 +25,8 @@ interface SummitCalendarState {
   items: SummitCalendarItem[];
   sortState: { sortColumn: string; sortDirection: string };
   activity: TerrainEvent;
+  calendarLoadState: "loading" | "ready" | "empty" | "error";
+  calendarLoadError: string | null;
   editorIsLoading: boolean;
   isEditorOpen: boolean;
   members: { value: string; text: string }[];
@@ -44,6 +46,8 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       items: [],
       sortState: { sortColumn: "file", sortDirection: "ascending" },
       activity: { start_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), end_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ") },
+      calendarLoadState: "loading",
+      calendarLoadError: null,
       editorIsLoading: false,
       isEditorOpen: false,
       members: [],
@@ -75,21 +79,31 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
   };
 
   fetchData = async (startDate?: string, endDate?: string) => {
-    const unitMembers = await fetchUnitMembers();
-    const members = unitMembers.map((member) => ({ value: member.id, text: member.first_name + " " + member.last_name }));
-    this.setState({ members: members, unitMembers: unitMembers });
+    this.setState({ calendarLoadState: "loading", calendarLoadError: null });
 
-    const defaultStart = moment().startOf("month").format("YYYY-MM-DDTHH:mm:ss");
-    const defaultEnd = moment().endOf("month").format("YYYY-MM-DDTHH:mm:ss");
-    const rangeStart = startDate ?? this.state.currentWindow?.startDate ?? defaultStart;
-    const rangeEnd = endDate ?? this.state.currentWindow?.endDate ?? defaultEnd;
+    try {
+      const unitMembers = await fetchUnitMembers();
+      const members = unitMembers.map((member) => ({ value: member.id, text: member.first_name + " " + member.last_name }));
+      this.setState({ members: members, unitMembers: unitMembers });
 
-    const data = await fetchMemberEvents(rangeStart, rangeEnd);
-    const items = data.map((item) => new SummitCalendarItem(item));
-    this.setState({
-      items: items,
-    });
-    this.props.onUpdate(items);
+      const defaultStart = moment().startOf("month").format("YYYY-MM-DDTHH:mm:ss");
+      const defaultEnd = moment().endOf("month").format("YYYY-MM-DDTHH:mm:ss");
+      const rangeStart = startDate ?? this.state.currentWindow?.startDate ?? defaultStart;
+      const rangeEnd = endDate ?? this.state.currentWindow?.endDate ?? defaultEnd;
+
+      const data = await fetchMemberEvents(rangeStart, rangeEnd);
+      const items = data.map((item) => new SummitCalendarItem(item));
+      this.setState({
+        items: items,
+        calendarLoadState: items.length === 0 ? "empty" : "ready",
+      });
+      this.props.onUpdate(items);
+    } catch (error) {
+      this.setState({
+        calendarLoadState: "error",
+        calendarLoadError: error instanceof Error ? error.message : "Unknown calendar load error",
+      });
+    }
   };
 
   handleDatesSet = (args: DatesSetArg) => {
@@ -489,7 +503,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       <div id="event-footer">
         <div id="right-button">
           {!activity?.id ? (
-            <button id="Save" className="summit-button summit-button-primary" onClick={() => this.saveActivity(true)}>
+            <button id="Save" className="summit-button summit-button-primary" data-editor-action="save-next-week" onClick={() => this.saveActivity(true)}>
               Save & Add Next Week
             </button>
           ) : (
@@ -526,10 +540,10 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
               Open in Terrain
             </button>
           )}
-          <button id="Save" className="summit-button summit-button-primary" onClick={() => this.saveActivity()}>
+          <button id="Save" className="summit-button summit-button-primary" data-editor-action="save" onClick={() => this.saveActivity()}>
             Save
           </button>
-          <button id="Cancel" className="summit-button summit-button-secondary" onClick={this.closeEditor}>
+          <button id="Cancel" className="summit-button summit-button-secondary" data-editor-action="cancel" onClick={this.closeEditor}>
             Cancel
           </button>
         </div>
@@ -542,7 +556,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
               Open in Terrain
             </button>
           )}
-          <button id="Cancel" className="summit-button summit-button-secondary" onClick={this.closeEditor}>
+          <button id="Cancel" className="summit-button summit-button-secondary" data-editor-action="cancel" onClick={this.closeEditor}>
             Close
           </button>
         </div>
@@ -575,6 +589,10 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
   };
 
   render(): React.ReactNode {
+    const isCalendarLoading = this.state.calendarLoadState === "loading";
+    const isCalendarEmpty = this.state.calendarLoadState === "empty";
+    const hasCalendarError = this.state.calendarLoadState === "error";
+
     const events = this.state.items.map((item) => ({
       id: item.Id,
       title: item.Subject,
@@ -589,6 +607,11 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
 
     return (
       <div id="scheduler" style={{ width: "100%", height: "100%" }}>
+        <div id="calendar-ux-contract" data-calendar-load-state={this.state.calendarLoadState} data-calendar-load-error={this.state.calendarLoadError ?? ""} hidden={true}>
+          <span id="calendar-loading-state" data-active={String(isCalendarLoading)} />
+          <span id="calendar-empty-state" data-active={String(isCalendarEmpty)} />
+          <span id="calendar-error-state" data-active={String(hasCalendarError)} />
+        </div>
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
           initialView="dayGridMonth"
@@ -606,8 +629,10 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           height={"auto"}
         />
         <DialogComponent id="calendar-editor-dialog" isModal={true} visible={this.state.isEditorOpen} header={this.editorHeaderTemplate()} close={this.closeEditor} closeOnEscape={true} showCloseIcon={true}>
-          {this.state.editorIsLoading ? <div>Loading event...</div> : this.editorTemplate()}
-          {!this.state.editorIsLoading && this.editorFooterTemplate()}
+          <div data-editor-speed-contract="calendar-editor-speed" data-editor-open-proxy={String(this.state.isEditorOpen)} data-editor-loading-proxy={String(this.state.editorIsLoading)}>
+            {this.state.editorIsLoading ? <div>Loading event...</div> : this.editorTemplate()}
+            {!this.state.editorIsLoading && this.editorFooterTemplate()}
+          </div>
         </DialogComponent>
         Select Calendars
         <select id="calendarSelector" name="calendarSelector" multiple={true} value={this.state.allCalendars.filter((c) => c.selected).map((c) => c.id)} onChange={this.handleCalendarChange} className="summit-form-input" size={8}>

@@ -212,12 +212,15 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => {
                 const canSort = header.column.getCanSort();
+                const sortState = header.column.getIsSorted();
+                const ariaSort = sortState === "asc" ? "ascending" : sortState === "desc" ? "descending" : "none";
 
                 return (
-                  <th key={header.id}>
+                  <th key={header.id} aria-sort={canSort ? ariaSort : undefined}>
                     {canSort ? (
                       <button type="button" onClick={header.column.getToggleSortingHandler()}>
                         {flexRender(header.column.columnDef.header, header.getContext())}
+                        <span data-grid-sort-indicator={header.id}>{sortState === "asc" ? " ▲" : sortState === "desc" ? " ▼" : ""}</span>
                       </button>
                     ) : (
                       flexRender(header.column.columnDef.header, header.getContext())
@@ -229,13 +232,21 @@ export const DataGrid = <TData extends object>({ id, data, columns, toolbarActio
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-              ))}
+          {table.getRowModel().rows.length === 0 ? (
+            <tr>
+              <td colSpan={Math.max(table.getAllLeafColumns().length, 1)} data-grid-empty-state="true">
+                No rows to display
+              </td>
             </tr>
-          ))}
+          ) : (
+            table.getRowModel().rows.map((row) => (
+              <tr key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                ))}
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>
