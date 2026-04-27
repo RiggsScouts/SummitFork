@@ -46,6 +46,12 @@
     ]
   },
   "dependencies": {
+    "@fullcalendar/core": "^6.1.20",
+    "@fullcalendar/daygrid": "^6.1.20",
+    "@fullcalendar/interaction": "^6.1.20",
+    "@fullcalendar/list": "^6.1.20",
+    "@fullcalendar/react": "^6.1.20",
+    "@fullcalendar/timegrid": "^6.1.20",
     "@syncfusion/ej2-base": "^28.2.12",
     "@syncfusion/ej2-buttons": "^28.2.7",
     "@syncfusion/ej2-dropdowns": "^28.2.12",

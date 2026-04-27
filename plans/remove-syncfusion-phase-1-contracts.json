@@ -1,15 +1,16 @@
 {
   "syncfusionImportInventory": {
     "src/pages/SummitCalendar/components/SummitCalendar.tsx": [
-      "@syncfusion/ej2-react-inputs",
-      "@syncfusion/ej2-react-schedule"
+      "@syncfusion/ej2-react-inputs"
     ]
   },
   "baselineRenderContracts": [
     {
       "file": "src/pages/SummitCalendar/components/SummitCalendar.tsx",
       "mustContain": [
-        "<ScheduleComponent",
+        "<FullCalendar",
+        "headerToolbar",
+        "id=\"calendar-editor-dialog\"",
         "renderGroupedMultiSelect(",
         "<optgroup",
         "<DialogComponent",
