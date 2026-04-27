@@ -16,6 +16,13 @@ export interface SummitCalendarValidationResult {
   errors: Record<string, string>;
 }
 
+export interface SummitCalendarConflictCandidate {
+  Id?: string;
+  Subject?: string;
+  StartTime?: Date | string;
+  EndTime?: Date | string;
+}
+
 interface MemberIdentity {
   id: string;
   first_name: string;
@@ -144,4 +151,34 @@ export const validateSummitCalendarActivity = (activity: Partial<TerrainEvent> |
     isValid: Object.keys(errors).length === 0,
     errors,
   };
+};
+
+export const detectSummitCalendarSoftConflicts = (activity: Partial<TerrainEvent> | undefined, items: SummitCalendarConflictCandidate[]): string[] => {
+  if (!activity?.start_datetime || !activity?.end_datetime || !items.length) {
+    return [];
+  }
+
+  const activityStart = moment(activity.start_datetime);
+  const activityEnd = moment(activity.end_datetime);
+
+  if (!activityStart.isValid() || !activityEnd.isValid() || !activityStart.isBefore(activityEnd)) {
+    return [];
+  }
+
+  return items
+    .filter((item) => {
+      const itemStart = moment(item.StartTime);
+      const itemEnd = moment(item.EndTime);
+
+      if (!itemStart.isValid() || !itemEnd.isValid()) {
+        return false;
+      }
+
+      if (activity.id && item.Id && activity.id === item.Id) {
+        return false;
+      }
+
+      return activityStart.isBefore(itemEnd) && activityEnd.isAfter(itemStart);
+    })
+    .map((item) => `Potential conflict with ${item.Subject ?? "Untitled event"}`);
 };

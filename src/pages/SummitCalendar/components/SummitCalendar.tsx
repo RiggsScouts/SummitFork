@@ -9,7 +9,16 @@ import SummitCalendarItem from "../models/SummitCalendarItems";
 import { createNewEvent, deleteEvent, fetchActivity, fetchMemberCalendars, fetchMemberEvents, fetchUnitMembers, updateEvent, updateMemberCalendars } from "@/services";
 import moment from "moment";
 import { TerrainEvent, TerrainUnitMember, TerrrainCalendarResult } from "@/types/terrainTypes";
-import { TerrainState, applyGroupedMultiSelectChange, buildGroupedMemberOptions, clearSummitCalendarEditorDraft, loadSummitCalendarEditorDraft, saveSummitCalendarEditorDraft, validateSummitCalendarActivity } from "@/helpers";
+import {
+  TerrainState,
+  applyGroupedMultiSelectChange,
+  buildGroupedMemberOptions,
+  clearSummitCalendarEditorDraft,
+  detectSummitCalendarSoftConflicts,
+  loadSummitCalendarEditorDraft,
+  saveSummitCalendarEditorDraft,
+  validateSummitCalendarActivity,
+} from "@/helpers";
 import { GroupedMultiSelectGroup } from "@/helpers/SummitCalendarValidation";
 import TerrainEventItem from "../models/TerrainEventItem";
 import { DatePickerComponent, TimePickerComponent } from "@/components/DateTimeInputs";
@@ -41,6 +50,7 @@ interface SummitCalendarState {
   allCalendars: { id: string; name: string; selected: boolean }[];
   currentWindow: { startDate: string; endDate: string } | null;
   editorValidationErrors: Record<string, string>;
+  editorSoftConflictWarnings: string[];
   currentCalendarView: string;
   calendarQuickFilter: CalendarQuickFilter;
   calendarRangeContextLabel: string;
@@ -66,6 +76,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       allCalendars: [],
       currentWindow: null,
       editorValidationErrors: {},
+      editorSoftConflictWarnings: [],
       currentCalendarView: this.loadPersistedCalendarView(),
       calendarQuickFilter: "all",
       calendarRangeContextLabel: "Current range: loading...",
@@ -166,6 +177,11 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
 
   setEditorValidationErrors = (editorValidationErrors: Record<string, string>) => {
     this.setState({ editorValidationErrors });
+  };
+
+  setSoftConflictWarnings = (activity: TerrainEvent | undefined) => {
+    const editorSoftConflictWarnings = detectSummitCalendarSoftConflicts(activity, this.state.items);
+    this.setState({ editorSoftConflictWarnings });
   };
 
   persistEditorDraft = (activity: TerrainEvent) => {
@@ -301,6 +317,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       isEditorOpen: false,
       editorIsLoading: false,
       editorValidationErrors: {},
+      editorSoftConflictWarnings: [],
       activity: { start_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), end_datetime: moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ") },
     });
   };
@@ -310,7 +327,10 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     if (activity) {
       activity.start_datetime = moment(activity.start_datetime).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ");
       activity.end_datetime = moment(activity.end_datetime).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ");
-      this.setState({ activity: activity, editorIsLoading: false, isEditorOpen: true, editorValidationErrors: {} }, this.focusTitleInput);
+      this.setState({ activity: activity, editorIsLoading: false, isEditorOpen: true, editorValidationErrors: {}, editorSoftConflictWarnings: [] }, () => {
+        this.focusTitleInput();
+        this.setSoftConflictWarnings(activity);
+      });
     } else this.newActivity(moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"), moment().utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"));
   };
 
@@ -321,7 +341,10 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       start_datetime: moment(startDate).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
       end_datetime: moment(endDate).utc().format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
     } as TerrainEvent;
-    this.setState({ activity: activity, editorIsLoading: false, isEditorOpen: true, editorValidationErrors: {} }, this.focusTitleInput);
+    this.setState({ activity: activity, editorIsLoading: false, isEditorOpen: true, editorValidationErrors: {}, editorSoftConflictWarnings: [] }, () => {
+      this.focusTitleInput();
+      this.setSoftConflictWarnings(activity);
+    });
   };
 
   challangeAreas = [
@@ -373,6 +396,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           () => {
             this.clearValidationErrorsFor(["date_range"]);
             this.persistEditorDraft(this.state.activity);
+            this.setSoftConflictWarnings(this.state.activity);
           },
         );
         break;
@@ -387,6 +411,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           () => {
             this.clearValidationErrorsFor(["date_range"]);
             this.persistEditorDraft(this.state.activity);
+            this.setSoftConflictWarnings(this.state.activity);
           },
         );
         break;
@@ -401,6 +426,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           () => {
             this.clearValidationErrorsFor(["date_range"]);
             this.persistEditorDraft(this.state.activity);
+            this.setSoftConflictWarnings(this.state.activity);
           },
         );
         break;
@@ -415,6 +441,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           () => {
             this.clearValidationErrorsFor(["date_range"]);
             this.persistEditorDraft(this.state.activity);
+            this.setSoftConflictWarnings(this.state.activity);
           },
         );
         break;
@@ -535,7 +562,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     }
   };
   editorTemplate = () => {
-    const { activity, currentUnitID, editorValidationErrors } = this.state;
+    const { activity, currentUnitID, editorValidationErrors, editorSoftConflictWarnings } = this.state;
     const memberGroups = buildGroupedMemberOptions(this.state.unitMembers);
     const scoutMethodGroups = this.getScoutMethodGroups();
     const isEditable = (activity?.status !== "concluded" && currentUnitID === activity?.owner_id) || (activity && activity.id === undefined);
@@ -588,6 +615,12 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           <TimePickerComponent id="end_time" value={new Date(activity?.end_datetime || new Date())} format="hh:mm a" onChange={this.handleDateTimeChange} name="end_time" disabled={!isEditable} showClearButton={false} />
           <div data-editor-validation="date_range" role="status">
             {editorValidationErrors.date_range ?? ""}
+          </div>
+          <div data-editor-warning="event-conflicts" role="status">
+            {editorSoftConflictWarnings.length > 0 && <div>Potential conflict:</div>}
+            {editorSoftConflictWarnings.map((warning, index) => (
+              <div key={`editor-soft-conflict-warning-${index}`}>{warning}</div>
+            ))}
           </div>
         </label>
         <label>
@@ -662,6 +695,8 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     }
 
     this.setEditorValidationErrors({});
+    const softConflictWarnings = detectSummitCalendarSoftConflicts(activity, this.state.items);
+    this.setState({ editorSoftConflictWarnings: softConflictWarnings });
 
     const eventToSave = new TerrainEventItem(activity);
     if (eventToSave.id) {
