@@ -30,8 +30,7 @@
     "build-prod": "webpack --config webpack.config.js --mode production",
     "build": "webpack --config webpack.config.js --mode development",
     "build-watch": "webpack --config webpack.config.js --mode development --watch",
-    "start": "webpack-dev-server --config webpack.config.js --mode development",
-    "licence": "npx syncfusion-license activate"
+    "start": "webpack-dev-server --config webpack.config.js --mode development"
   },
   "browserslist": {
     "production": [
@@ -52,23 +51,6 @@
     "@fullcalendar/list": "^6.1.20",
     "@fullcalendar/react": "^6.1.20",
     "@fullcalendar/timegrid": "^6.1.20",
-    "@syncfusion/ej2-base": "^28.2.12",
-    "@syncfusion/ej2-buttons": "^28.2.7",
-    "@syncfusion/ej2-dropdowns": "^28.2.12",
-    "@syncfusion/ej2-inputs": "^28.2.11",
-    "@syncfusion/ej2-lists": "^28.2.3",
-    "@syncfusion/ej2-navigations": "^28.2.12",
-    "@syncfusion/ej2-popups": "^28.2.9",
-    "@syncfusion/ej2-react-base": "^28.2.7",
-    "@syncfusion/ej2-react-buttons": "^28.2.7",
-    "@syncfusion/ej2-react-calendars": "^28.2.11",
-    "@syncfusion/ej2-react-dropdowns": "^28.2.12",
-    "@syncfusion/ej2-react-grids": "^28.2.12",
-    "@syncfusion/ej2-react-inputs": "^28.2.11",
-    "@syncfusion/ej2-react-navigations": "^28.2.12",
-    "@syncfusion/ej2-react-notifications": "^28.2.3",
-    "@syncfusion/ej2-react-popups": "^28.2.9",
-    "@syncfusion/ej2-react-schedule": "^28.2.11",
     "@tanstack/react-table": "^8.21.3",
     "big.js": "^6.2.2",
     "install": "^0.13.0",

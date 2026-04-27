@@ -1,11 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
 
-type Phase1Contracts = {
-  syncfusionImportInventory: Record<string, string[]>;
-};
-
-const CONTRACTS_PATH = path.resolve(__dirname, "../../../plans/remove-syncfusion-phase-1-contracts.json");
 const PAGES_ROOT = path.resolve(__dirname, "../../../src/pages");
 
 const normalizePath = (value: string) => value.replace(/\\/g, "/");
@@ -43,10 +38,7 @@ const extractSyncfusionImports = (sourceCode: string): string[] => {
 };
 
 describe("syncfusion import inventory detection", () => {
-  it("matches the Phase 1 import inventory contract for src/pages", () => {
-    expect(fs.existsSync(CONTRACTS_PATH)).toBe(true);
-
-    const contracts = JSON.parse(fs.readFileSync(CONTRACTS_PATH, "utf8")) as Phase1Contracts;
+  it("contains no remaining Syncfusion imports for src/pages", () => {
     const tsxFiles = collectFiles(PAGES_ROOT, (fileName) => fileName.endsWith(".tsx"));
     const actualInventory: Record<string, string[]> = {};
 
@@ -61,7 +53,6 @@ describe("syncfusion import inventory detection", () => {
       actualInventory[repoRelativePath] = imports;
     }
 
-    expect(Object.keys(actualInventory).length).toBeGreaterThan(0);
-    expect(actualInventory).toEqual(contracts.syncfusionImportInventory);
+    expect(actualInventory).toEqual({});
   });
 });

@@ -280,7 +280,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
     const optionCount = groups.reduce((count, group) => count + group.options.length, 0);
 
     return (
-      <select id={id} name={id} multiple={true} value={value} onChange={this.handleGroupedMultiSelectChange} disabled={disabled} className="e-input" size={Math.min(Math.max(optionCount, 4), 10)}>
+      <select id={id} name={id} multiple={true} value={value} onChange={this.handleGroupedMultiSelectChange} disabled={disabled} className="summit-form-input" size={Math.min(Math.max(optionCount, 4), 10)}>
         {groups.map((group) => (
           <optgroup key={`${id}-${group.label}`} label={group.label}>
             {group.options.map((option) => (
@@ -319,12 +319,12 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       <div className="editor-container">
         <label>
           Title <span style={{ color: "red" }}>*</span>
-          <input className="e-input" type="text" name="title" value={activity?.title || ""} onChange={this.handleInputChange} disabled={!isEditable} data-msg-containerid="titleError" />
+          <input className="summit-form-input" type="text" name="title" value={activity?.title || ""} onChange={this.handleInputChange} disabled={!isEditable} data-msg-containerid="titleError" />
           <div id="titleError" />
         </label>
         <label>
           Location <span style={{ color: "red" }}>*</span>
-          <input className="e-input" type="text" name="location" value={activity?.location || ""} onChange={this.handleInputChange} disabled={!isEditable} />
+          <input className="summit-form-input" type="text" name="location" value={activity?.location || ""} onChange={this.handleInputChange} disabled={!isEditable} />
         </label>
         <label>
           Challenge Area <span style={{ color: "red" }}>*</span>
@@ -362,7 +362,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
             this.renderGroupedMultiSelect("scout_method_elements", scoutMethodGroups, this.state.activity?.review?.scout_method_elements ?? [], !isEditable)
           ) : (
             <input
-              className="e-input"
+              className="summit-form-input"
               value={activity?.review?.scout_method_elements
                 .map((sm) => {
                   return this.scoutMethodOptions.find((smo) => smo.value == sm)?.text;
@@ -384,7 +384,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
               !isEditable,
             )
           ) : (
-            <input className="e-input" type="text" name="organisers" value={activity?.organisers?.map((i) => i.first_name + " " + i.last_name).join(", ")} disabled={true} />
+            <input className="summit-form-input" type="text" name="organisers" value={activity?.organisers?.map((i) => i.first_name + " " + i.last_name).join(", ")} disabled={true} />
           )}
         </label>
         <label>
@@ -399,7 +399,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
               !isEditable,
             )
           ) : (
-            <input className="e-input" type="text" name="leads" value={activity?.attendance?.leader_members?.map((i) => i.first_name + " " + i.last_name).join(", ")} disabled={true} />
+            <input className="summit-form-input" type="text" name="leads" value={activity?.attendance?.leader_members?.map((i) => i.first_name + " " + i.last_name).join(", ")} disabled={true} />
           )}
         </label>
         <label>
@@ -489,14 +489,13 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       <div id="event-footer">
         <div id="right-button">
           {!activity?.id ? (
-            <button id="Save" className="e-control e-btn e-primary" data-ripple="true" onClick={() => this.saveActivity(true)}>
+            <button id="Save" className="summit-button summit-button-primary" onClick={() => this.saveActivity(true)}>
               Save & Add Next Week
             </button>
           ) : (
             <button
               id="Delete"
-              className="e-control e-btn e-danger"
-              data-ripple="true"
+              className="summit-button summit-button-danger"
               onClick={() => {
                 const dialogObj = DialogUtility.confirm({
                   title: "Delete Item",
@@ -523,14 +522,14 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
             </button>
           )}
           {!!activity?.id && (
-            <button id="open-modal" className="e-control e-btn e-secondary" data-ripple="true" onClick={this.openTerrainDialog}>
+            <button id="open-modal" className="summit-button summit-button-secondary" onClick={this.openTerrainDialog}>
               Open in Terrain
             </button>
           )}
-          <button id="Save" className="e-control e-btn e-primary" data-ripple="true" onClick={() => this.saveActivity()}>
+          <button id="Save" className="summit-button summit-button-primary" onClick={() => this.saveActivity()}>
             Save
           </button>
-          <button id="Cancel" className="e-control e-btn e-secondary" data-ripple="true" onClick={this.closeEditor}>
+          <button id="Cancel" className="summit-button summit-button-secondary" onClick={this.closeEditor}>
             Cancel
           </button>
         </div>
@@ -539,11 +538,11 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       <div id="event-footer">
         <div id="right-button">
           {!!activity?.id && (
-            <button id="open-modal" className="e-control e-btn e-secondary" data-ripple="true" onClick={this.openTerrainDialog}>
+            <button id="open-modal" className="summit-button summit-button-secondary" onClick={this.openTerrainDialog}>
               Open in Terrain
             </button>
           )}
-          <button id="Cancel" className="e-control e-btn e-secondary" data-ripple="true" onClick={this.closeEditor}>
+          <button id="Cancel" className="summit-button summit-button-secondary" onClick={this.closeEditor}>
             Close
           </button>
         </div>
@@ -556,7 +555,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
       click: () => {
         this.setState({ hideDialog: true });
       },
-      buttonModel: { content: "Close Event", isPrimary: true, cssClass: "e-event-edit e-btn e-primary" },
+      buttonModel: { content: "Close Event", isPrimary: true, cssClass: "summit-button summit-button-primary" },
     },
   ];
 
@@ -611,7 +610,7 @@ export class SummitCalendarComponent extends React.Component<SummitCalendarProps
           {!this.state.editorIsLoading && this.editorFooterTemplate()}
         </DialogComponent>
         Select Calendars
-        <select id="calendarSelector" name="calendarSelector" multiple={true} value={this.state.allCalendars.filter((c) => c.selected).map((c) => c.id)} onChange={this.handleCalendarChange} className="e-input" size={8}>
+        <select id="calendarSelector" name="calendarSelector" multiple={true} value={this.state.allCalendars.filter((c) => c.selected).map((c) => c.id)} onChange={this.handleCalendarChange} className="summit-form-input" size={8}>
           {this.getCalendarGroups().map((group) => (
             <optgroup key={`calendar-${group.label}`} label={group.label}>
               {group.options.map((option) => (
