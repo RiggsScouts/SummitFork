@@ -248,6 +248,21 @@
   font-weight: var(--summit-font-weight-semibold);
 }
 
+#scheduler .fc .fc-prev-button,
+#scheduler .fc .fc-next-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#scheduler .fc .fc-prev-button .fc-icon,
+#scheduler .fc .fc-next-button .fc-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
 .data-grid-container {
   display: flex;
   flex-direction: column;
